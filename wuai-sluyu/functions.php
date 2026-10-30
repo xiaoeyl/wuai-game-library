@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WUAI_SLUYU_VERSION', '1.0.0');
+define('WUAI_SLUYU_VERSION', '1.0.3');
 define('WUAI_SLUYU_DIR', get_stylesheet_directory());
 define('WUAI_SLUYU_URI', get_stylesheet_directory_uri());
 
@@ -19,6 +19,7 @@ add_action('wp_enqueue_scripts', function () {
     wp_localize_script('wuai-sluyu', 'wuaiSluyu', [
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('wuai_sluyu'),
+        'defaultImage' => wuai_sluyu_asset('images/default.jpg'),
     ]);
 });
 
@@ -35,7 +36,18 @@ add_action('after_setup_theme', function () {
 
 add_filter('body_class', function ($classes) {
     $classes[] = 'wuai-sluyu-site';
+    if (wuai_sluyu_option('glass_cards', '1') === '1') {
+        $classes[] = 'wuai-glass-cards';
+    }
+    if (wuai_sluyu_option('color_scrollbar', '1') === '1') {
+        $classes[] = 'wuai-color-scrollbar';
+    }
     return $classes;
+});
+
+// Keep the public site clean; administrators can still open /wp-admin directly.
+add_filter('show_admin_bar', function ($show) {
+    return is_admin() ? $show : false;
 });
 
 add_filter('excerpt_length', function () {
@@ -45,6 +57,13 @@ add_filter('excerpt_length', function () {
 add_filter('excerpt_more', function () {
     return '…';
 });
+
+add_filter('the_content', function ($content) {
+    if (!is_singular() || wuai_sluyu_option('enable_lightbox', '1') !== '1' || stripos($content, '<img') === false) {
+        return $content;
+    }
+    return preg_replace('/<img\b(?![^>]*\bdata-sluyu-lightbox=)/i', '<img data-sluyu-lightbox="1"', $content);
+}, 20);
 
 add_action('init', function () {
     add_image_size('wuai-sluyu-card', 475, 534, true);

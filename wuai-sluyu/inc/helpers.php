@@ -70,13 +70,15 @@ function wuai_sluyu_section_categories() {
     return $sections;
 }
 
-function wuai_sluyu_render_card($post_id = 0) {
+function wuai_sluyu_render_card($post_id = 0, $style = 'standard') {
     $post_id = $post_id ?: get_the_ID();
     $cats = get_the_category($post_id);
     $cat = $cats ? $cats[0] : null;
     $featured = get_post_meta($post_id, '_wuai_sluyu_featured', true);
+    $title_badge = wuai_sluyu_post_meta($post_id, 'title_badge');
+    $title_badge_color = sanitize_hex_color(wuai_sluyu_post_meta($post_id, 'title_badge_color', '#ef0053')) ?: '#ef0053';
     ?>
-    <article class="sluyu-card">
+    <article class="sluyu-card sluyu-card-<?php echo esc_attr($style); ?><?php echo $featured ? ' is-featured' : ''; ?>">
         <div class="sluyu-card-media">
             <a href="<?php echo esc_url(get_permalink($post_id)); ?>">
                 <img src="<?php echo esc_url(wuai_sluyu_image($post_id)); ?>" alt="<?php echo esc_attr(get_the_title($post_id)); ?>" loading="lazy">
@@ -85,10 +87,20 @@ function wuai_sluyu_render_card($post_id = 0) {
             <?php if (wuai_sluyu_post_meta($post_id, 'download_url')) : ?><span class="sluyu-card-download">下载</span><?php endif; ?>
         </div>
         <div class="sluyu-card-body">
-            <h3><a href="<?php echo esc_url(get_permalink($post_id)); ?>"><?php echo esc_html(get_the_title($post_id)); ?></a></h3>
-            <p><?php echo esc_html(wuai_sluyu_excerpt($post_id)); ?></p>
+            <h3><?php if ($title_badge) : ?><span class="sluyu-title-badge" style="--badge-color:<?php echo esc_attr($title_badge_color); ?>"><?php echo esc_html($title_badge); ?></span><?php endif; ?><a href="<?php echo esc_url(get_permalink($post_id)); ?>"><?php echo esc_html(get_the_title($post_id)); ?></a></h3>
+            <?php if ($style !== 'overlay') : ?><p><?php echo esc_html(wuai_sluyu_excerpt($post_id)); ?></p><?php endif; ?>
             <div class="sluyu-card-meta"><span><?php echo esc_html($cat ? $cat->name : '资源分享'); ?></span><time><?php echo esc_html(get_the_date('m月d日', $post_id)); ?></time></div>
         </div>
+    </article>
+    <?php
+}
+
+function wuai_sluyu_render_demo_card($image, $title, $style = 'overlay', $category = '精选内容') {
+    $image_url = wuai_sluyu_asset('images/sluyu/' . ltrim($image, '/'));
+    ?>
+    <article class="sluyu-card sluyu-card-<?php echo esc_attr($style); ?> sluyu-demo-card">
+        <div class="sluyu-card-media"><a href="<?php echo esc_url(home_url('/')); ?>"><img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($title); ?>" loading="lazy"></a><span class="sluyu-card-badge">精选</span></div>
+        <div class="sluyu-card-body"><h3><a href="<?php echo esc_url(home_url('/')); ?>"><?php echo esc_html($title); ?></a></h3><div class="sluyu-card-meta"><span><?php echo esc_html($category); ?></span><time>今日更新</time></div></div>
     </article>
     <?php
 }
