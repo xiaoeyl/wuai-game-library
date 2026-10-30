@@ -1,0 +1,3 @@
+<?php get_header(); ?>
+<main class="sluyu-container sluyu-main"><div class="sluyu-content-layout"><section class="sluyu-list"><header class="sluyu-list-title"><h1><?php the_archive_title(); ?></h1><p><?php the_archive_description(); ?></p></header><?php if (have_posts()) : ?><div class="sluyu-grid"><?php while (have_posts()) : the_post(); wuai_sluyu_render_card(); endwhile; ?></div><?php the_posts_pagination(['mid_size' => 1, 'prev_text' => '上一页', 'next_text' => '下一页']); ?><?php else : ?><p class="sluyu-empty">暂无内容</p><?php endif; ?></section><?php get_sidebar(); ?></div></main>
+<?php get_footer(); ?>

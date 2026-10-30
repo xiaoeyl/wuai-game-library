@@ -1,0 +1,2 @@
+<?php if (post_password_required()) return; ?>
+<section class="sluyu-comments" id="comments"><h2><?php echo esc_html(get_comments_number()); ?> 条评论</h2><?php if (have_comments()) : ?><ol><?php wp_list_comments(['style' => 'ol', 'short_ping' => true]); ?></ol><?php endif; ?><?php comment_form(['title_reply' => '留下评论', 'label_submit' => '发表评论', 'class_submit' => 'sluyu-comment-submit']); ?></section>

@@ -1,0 +1,5 @@
+wordpress-*.zip
+dist/
+*.log
+.DS_Store
+Thumbs.db

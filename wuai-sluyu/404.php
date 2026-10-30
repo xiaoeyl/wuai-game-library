@@ -1,0 +1,1 @@
+<?php get_header(); ?><main class="sluyu-container sluyu-main"><section class="sluyu-empty-page"><h1>页面没有找到</h1><p>可能链接已变更，返回首页继续浏览吧。</p><a href="<?php echo esc_url(home_url('/')); ?>">返回首页</a></section></main><?php get_footer(); ?>

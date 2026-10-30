@@ -1,0 +1,3 @@
+<?php get_header(); ?>
+<main class="sluyu-container sluyu-main"><div class="sluyu-content-layout"><section class="sluyu-list"><header class="sluyu-list-title"><h1><?php echo is_search() ? '搜索结果' : '最新内容'; ?></h1><p><?php echo is_search() ? esc_html(get_search_query()) : '持续更新的游戏资源、图包和资讯'; ?></p></header><?php if (have_posts()) : ?><div class="sluyu-grid"><?php while (have_posts()) : the_post(); wuai_sluyu_render_card(); endwhile; ?></div><?php the_posts_pagination(['mid_size' => 1, 'prev_text' => '上一页', 'next_text' => '下一页']); ?><?php else : ?><p class="sluyu-empty">暂无内容</p><?php endif; ?></section><?php get_sidebar(); ?></div></main>
+<?php get_footer(); ?>
