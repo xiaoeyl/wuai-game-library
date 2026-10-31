@@ -94,13 +94,3 @@ function wuai_sluyu_render_card($post_id = 0, $style = 'standard') {
     </article>
     <?php
 }
-
-function wuai_sluyu_render_demo_card($image, $title, $style = 'overlay', $category = '精选内容') {
-    $image_url = wuai_sluyu_asset('images/sluyu/' . ltrim($image, '/'));
-    ?>
-    <article class="sluyu-card sluyu-card-<?php echo esc_attr($style); ?> sluyu-demo-card">
-        <div class="sluyu-card-media"><a href="<?php echo esc_url(home_url('/')); ?>"><img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($title); ?>" loading="lazy"></a><span class="sluyu-card-badge">精选</span></div>
-        <div class="sluyu-card-body"><h3><a href="<?php echo esc_url(home_url('/')); ?>"><?php echo esc_html($title); ?></a></h3><div class="sluyu-card-meta"><span><?php echo esc_html($category); ?></span><time>今日更新</time></div></div>
-    </article>
-    <?php
-}

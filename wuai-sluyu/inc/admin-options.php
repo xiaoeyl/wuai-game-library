@@ -207,7 +207,7 @@ function wuai_sluyu_options_page() {
                                 <?php wuai_sluyu_field('hot_words', '热搜词', $options, 'text', '使用逗号分隔，例如：黑神话,生化危机,游戏资源'); ?>
                             </div>
                             <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-layout"></span><div><h2>首页模块</h2><p>控制栏目、横幅和侧栏广告资源。</p></div></div>
-                                <?php wuai_sluyu_field('sections', '首页栏目', $options, 'textarea', '每行一个分类名称，最多显示四个栏目'); ?>
+                                <?php wuai_sluyu_field('sections', '首页栏目', $options, 'textarea', '每行一个已有分类名称，最多显示四个栏目；栏目只展示已发布文章，空栏目显示暂无内容，不生成演示文章'); ?>
                                 <?php wuai_sluyu_field('promo_image', '横幅图片 URL', $options, 'url'); ?>
                                 <?php wuai_sluyu_field('ad_image', '侧栏广告 URL', $options, 'url'); ?>
                             </div>
@@ -270,7 +270,7 @@ function wuai_sluyu_options_page() {
                                 <?php wuai_sluyu_field('github_channel', '更新通道', $options, 'select', '', ['stable' => '稳定版 Release', 'beta' => '测试版 Release']); ?>
                                 <div class="wuai-update-actions"><a class="button button-primary" href="<?php echo esc_url(admin_url('update-core.php?force-check=1')); ?>">立即检查主题更新</a><a class="button" href="<?php echo esc_url('https://github.com/' . rawurlencode($options['github_owner']) . '/' . rawurlencode($options['github_repo']) . '/releases'); ?>" target="_blank" rel="noopener">打开 GitHub Releases</a></div>
                             </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-shield"></span><div><h2>更新说明</h2><p>发布新版本时，请使用主题 ZIP 作为 Release 附件。</p></div></div><div class="wuai-guide-list"><div><b>01</b><span>上传命名为 <code>wuai-sluyu-v1.0.2.zip</code> 的压缩包。</span></div><div><b>02</b><span>创建 GitHub Release，并填写版本标签。</span></div><div><b>03</b><span>回到后台“仪表盘 → 更新”执行检查。</span></div></div></div>
+                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-shield"></span><div><h2>更新说明</h2><p>发布新版本时，请使用主题 ZIP 作为 Release 附件。</p></div></div><div class="wuai-guide-list"><div><b>01</b><span>上传命名为 <code>wuai-sluyu-v<?php echo esc_html(WUAI_SLUYU_VERSION); ?>.zip</code> 的压缩包。</span></div><div><b>02</b><span>创建 GitHub Release，并填写版本标签。</span></div><div><b>03</b><span>回到后台“仪表盘 → 更新”执行检查。</span></div></div></div>
                         </div>
                     </section>
                 </main>
