@@ -30,14 +30,16 @@ $section_banners = [
                         <a href="<?php echo esc_url($url); ?>"><img src="<?php echo esc_url(wuai_sluyu_asset('images/sluyu/' . $item[2])); ?>" alt=""><span><strong><?php echo esc_html($item[0]); ?></strong><small><?php echo esc_html($item[1]); ?> · 精选内容</small></span></a>
                     <?php endforeach; ?>
                 </div>
-                <div class="sluyu-shortcut-links"><a class="highlight" href="<?php echo esc_url(home_url('/about/')); ?>">关于本站</a><a href="<?php echo esc_url(wp_login_url()); ?>">会员中心</a><a href="<?php echo esc_url(home_url('/task/')); ?>">任务中心</a><a href="<?php echo esc_url(home_url('/today/')); ?>">每日签到</a></div>
+                <div class="sluyu-shortcut-links"><a class="highlight" href="<?php echo esc_url(wuai_sluyu_portal_url('gyuwo')); ?>">关于本站</a><a href="<?php echo esc_url(wuai_sluyu_portal_url('vips')); ?>">会员中心</a><a href="<?php echo esc_url(wuai_sluyu_portal_url('task')); ?>">任务中心</a><a href="<?php echo esc_url(wuai_sluyu_portal_url('mission')); ?>">每日签到</a></div>
             </div>
         </section>
         <aside class="sluyu-home-side">
-            <a class="sluyu-side-ad" href="<?php echo esc_url(home_url('/about/')); ?>"><img src="<?php echo esc_url(wuai_sluyu_asset('images/sluyu/2026022502224161.jpg')); ?>" alt="关于本站"></a>
-            <a class="sluyu-side-mini-ad" href="<?php echo esc_url(home_url('/today/')); ?>"><img src="<?php echo esc_url(wuai_sluyu_asset('images/sluyu/2026022803495878.png')); ?>" alt="每日签到"></a>
-            <section class="sluyu-sign-card"><div class="sluyu-sign-title"><span>🎁</span><div><strong>每日签到</strong><small>连续签到领取积分奖励</small></div></div><a class="sluyu-sign-button" href="<?php echo esc_url(is_user_logged_in() ? get_edit_profile_url() : wp_login_url()); ?>"><?php echo is_user_logged_in() ? '今日签到' : '登录后签到'; ?></a><div class="sluyu-progress"><i></i></div><p>签到可兑换下载加速和会员权益</p></section>
+            <?php if (is_active_sidebar('sluyu-home')) : dynamic_sidebar('sluyu-home'); else : ?>
+            <a class="sluyu-side-ad" href="<?php echo esc_url(wuai_sluyu_portal_url('gyuwo')); ?>"><img src="<?php echo esc_url(wuai_sluyu_asset('images/sluyu/2026022502224161.jpg')); ?>" alt="关于本站"></a>
+            <a class="sluyu-side-mini-ad" href="<?php echo esc_url(wuai_sluyu_portal_url('mission')); ?>"><img src="<?php echo esc_url(wuai_sluyu_asset('images/sluyu/2026022803495878.png')); ?>" alt="每日签到"></a>
+            <section class="sluyu-sign-card"><div class="sluyu-sign-title"><span>🎁</span><div><strong>每日签到</strong><small>每天记录相遇，领取积分</small></div></div><a class="sluyu-sign-button" href="<?php echo esc_url(wuai_sluyu_portal_url('mission')); ?>">签到与排行</a><p>每日签到 +<?php echo absint(wuai_sluyu_option('checkin_points',10)); ?> 积分 · <a href="<?php echo esc_url(wuai_sluyu_portal_url('task')); ?>">查看任务</a></p></section>
             <section class="sluyu-rank-card"><h2>最新文章</h2><?php $rank = new WP_Query(['post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 5, 'no_found_rows' => true, 'ignore_sticky_posts' => true]); if ($rank->have_posts()) : $i = 1; while ($rank->have_posts()) : $rank->the_post(); ?><a class="sluyu-rank-item" href="<?php the_permalink(); ?>"><b><?php echo esc_html($i++); ?></b><img src="<?php echo esc_url(wuai_sluyu_image(get_the_ID(), 'thumbnail')); ?>" alt=""><span><?php the_title(); ?><small><?php echo esc_html(get_the_date('m月d日')); ?></small></span></a><?php endwhile; wp_reset_postdata(); else : ?><p class="sluyu-empty">暂无已发布文章</p><?php endif; ?></section>
+            <?php endif; ?>
         </aside>
     </div>
 

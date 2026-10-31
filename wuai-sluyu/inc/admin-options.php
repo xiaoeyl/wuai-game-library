@@ -66,6 +66,10 @@ function wuai_sluyu_defaults() {
         'github_repo' => 'wuai-game-library',
         'github_channel' => 'stable',
         'legacy_html_links' => '1',
+        'checkin_points' => '10',
+        'makeup_points' => '30',
+        'membership_products' => '',
+        'public_coupon_codes' => '',
     ];
 }
 
@@ -80,7 +84,7 @@ function wuai_sluyu_sanitize_options($input) {
     $output = $defaults;
     $switches = ['show_post_meta', 'show_resource_box', 'enable_comments', 'show_floating_tools', 'show_mobile_nav', 'enable_lightbox', 'enable_loader', 'enable_particles', 'glass_cards', 'color_scrollbar', 'enable_og', 'legacy_html_links', 'footer_show_stats', 'article_show_cover', 'article_show_toc', 'article_show_related'];
     $urls = ['site_logo', 'site_icon', 'hero_video', 'hero_image', 'promo_image', 'ad_image', 'footer_banner', 'footer_banner_url', 'footer_terms_url', 'footer_disclaimer_url', 'footer_circle_url', 'footer_verify_url', 'footer_help_url', 'footer_about_url', 'rail_vip_url', 'rail_account_url', 'rail_cart_url', 'rail_coupon_url', 'rail_message_url', 'rail_support_url', 'rail_group_qr', 'article_banner'];
-    $multiline = ['site_description', 'hero_notice', 'sections', 'seo_description', 'footer_text', 'footer_description', 'rail_support_text'];
+    $multiline = ['site_description', 'hero_notice', 'sections', 'seo_description', 'footer_text', 'footer_description', 'rail_support_text', 'public_coupon_codes'];
     foreach ($defaults as $key => $default) {
         if (!array_key_exists($key, $input) || !is_scalar($input[$key])) {
             continue;
@@ -94,6 +98,10 @@ function wuai_sluyu_sanitize_options($input) {
             $output[$key] = sanitize_hex_color($value) ?: $default;
         } elseif ($key === 'border_radius' || $key === 'content_width') {
             $output[$key] = (string) max($key === 'content_width' ? 980 : 0, min($key === 'content_width' ? 1600 : 32, absint($value)));
+        } elseif (in_array($key, ['checkin_points','makeup_points'], true)) {
+            $output[$key] = (string) max($key === 'makeup_points' ? 1 : 0, min(10000, absint($value)));
+        } elseif ($key === 'membership_products') {
+            $output[$key] = implode(',', array_filter(array_map('absint', preg_split('/[,\s]+/', $value))));
         } elseif ($key === 'github_channel') {
             $output[$key] = in_array($value, ['stable', 'beta'], true) ? $value : 'stable';
         } elseif ($key === 'github_owner' || $key === 'github_repo') {
@@ -210,6 +218,16 @@ function wuai_sluyu_register_csf_options() {
         'fields' => [['type' => 'callback', 'function' => 'wuai_sluyu_csf_overview']],
     ]);
     CSF::createSection($prefix, ['id' => 'basic', 'title' => '基础设置', 'icon' => 'fa fa-cog']);
+    CSF::createSection($prefix, [
+        'title' => '社区与商城', 'icon' => 'fa fa-users',
+        'fields' => [
+            ['type'=>'content', 'content'=>'<p>服务页面无需预建即可访问。通过服务管理可创建可编辑页面和分类，已有内容不会覆盖。</p><a class="button" href="' . esc_url(admin_url('admin.php?page=wuai-sluyu-services')) . '">站内服务管理</a>'],
+            wuai_sluyu_csf_field('checkin_points','number','每日签到积分',['min'=>0,'max'=>10000]),
+            wuai_sluyu_csf_field('makeup_points','number','每个缺签日补签费用',['min'=>1,'max'=>10000]),
+            wuai_sluyu_csf_field('membership_products','text','会员商品 ID',['desc'=>'使用英文逗号分隔 WooCommerce 简单商品 ID，并在商品编辑页设置会员有效天数。真实付款确认后开通会员；退款撤回对应授权。']),
+            wuai_sluyu_csf_field('public_coupon_codes','textarea','公开发放的优惠码',['desc'=>'每行一个已在 WooCommerce 创建的优惠码。只展示这里明确配置的券，结算时验证适用性。']),
+        ],
+    ]);
     CSF::createSection($prefix, [
         'parent' => 'basic', 'title' => '站点信息', 'icon' => 'fa fa-globe',
         'fields' => [

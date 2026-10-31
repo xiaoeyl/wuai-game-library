@@ -95,7 +95,7 @@ fs.mkdirSync(output, { recursive: true });
         await loginPage.goto(base + '/wp-login.php');
         await loginPage.locator('#user_login').fill('qa_subscriber');
         await loginPage.locator('#user_pass').fill('qa-local-only');
-        await Promise.all([loginPage.waitForURL(/wp-admin/), loginPage.locator('#wp-submit').click()]);
+        await Promise.all([loginPage.waitForURL(url=>!url.pathname.includes('wp-login.php')), loginPage.locator('#wp-submit').click()]);
         for (const form of [
             { action: 'csf_wuai_sluyu_options_ajax_save', data: JSON.stringify({ csf_options_noncewuai_sluyu_options: nonce, wuai_sluyu_options: { site_title: 'subscriber denied' } }) },
             { action: 'csf-import', unique: 'wuai_sluyu_options', nonce: backupNonce, data: JSON.stringify(baseline) },

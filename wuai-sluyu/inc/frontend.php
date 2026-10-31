@@ -4,6 +4,8 @@ if (!defined('ABSPATH')) {
 }
 
 function wuai_sluyu_icon($name) {
+    $aliases = ['links-line'=>'external-link-line','book-open-line'=>'article-line','file-list-line'=>'file-list-2-line','vip-crown-line'=>'vip-crown-2-line','heart-line'=>'hearts-line','file-text-line'=>'article-line','edit-line'=>'edit-2-line','tools-line'=>'settings-3-line','apps-line'=>'xitongdaohang','inbox-line'=>'file-3-fill'];
+    $name = $aliases[$name] ?? $name;
     return '<i class="b2font b2-' . esc_attr($name) . '" aria-hidden="true"></i>';
 }
 
@@ -16,6 +18,11 @@ function wuai_sluyu_page_link($option, $slugs = []) {
         $page = get_page_by_path($slug);
         if ($page && $page->post_status === 'publish') {
             return get_permalink($page);
+        }
+    }
+    if (function_exists('wuai_sluyu_portal_key')) {
+        foreach ($slugs as $slug) {
+            if (wuai_sluyu_portal_key($slug)) { return wuai_sluyu_portal_url($slug); }
         }
     }
     return '';
@@ -55,20 +62,16 @@ function wuai_sluyu_frontend_action() {
     }
     $operation = isset($_POST['operation']) ? sanitize_key(wp_unslash($_POST['operation'])) : '';
     $user_id = get_current_user_id();
+    if (function_exists('wuai_sluyu_banned') && wuai_sluyu_banned($user_id)) {
+        wp_send_json_error(['message' => '禁言期间暂时无法操作。'], 403);
+    }
     if ($operation === 'checkin') {
-        $today = wp_date('Y-m-d');
-        $previous = get_user_meta($user_id, '_wuai_sluyu_checkin_date', true);
-        if ($previous !== $today) {
-            $days = (int) get_user_meta($user_id, '_wuai_sluyu_checkin_days', true) + 1;
-            update_user_meta($user_id, '_wuai_sluyu_checkin_date', $today);
-            update_user_meta($user_id, '_wuai_sluyu_checkin_days', $days);
-        }
-        wp_send_json_success(['message' => $previous === $today ? '今天已经签到啦。' : '签到成功，明天再来！', 'days' => (int) get_user_meta($user_id, '_wuai_sluyu_checkin_days', true)]);
+        wuai_sluyu_community_ajax();
     }
     if ($operation === 'like') {
         $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
         $post = get_post($post_id);
-        if (!$post || $post->post_type !== 'post' || $post->post_status !== 'publish' || post_password_required($post)) {
+        if (!$post || !in_array($post->post_type, ['post','sluyu_topic','sluyu_news','sluyu_link'], true) || $post->post_status !== 'publish' || post_password_required($post)) {
             wp_send_json_error(['message' => '这篇文章暂时无法操作。'], 403);
         }
         $key = '_wuai_sluyu_like_' . $post_id;
@@ -101,12 +104,17 @@ function wuai_sluyu_download_card($post_id, $compact = false) {
     if (!$url || $options['show_resource_box'] !== '1' || post_password_required($post_id)) {
         return;
     }
+    if (!wuai_sluyu_resource_access($post_id)) {
+        $member = wuai_sluyu_post_meta($post_id, 'download_access') === 'member';
+        echo '<section class="sluyu-panel sluyu-resource-locked" id="' . ($compact ? 'download-sidebar' : 'download-box') . '"><h3>下载权限</h3><p>' . ($member ? '此资源需要有效会员权限。' : '登录后可下载此资源。') . '</p><a class="sluyu-action-primary" href="' . esc_url(is_user_logged_in() ? wuai_sluyu_portal_url('vips') : wp_login_url(get_permalink($post_id))) . '">' . (is_user_logged_in() ? '查看会员计划' : '登录后继续') . '</a></section>';
+        return;
+    }
     $code = wuai_sluyu_post_meta($post_id, 'download_password');
     $version = wuai_sluyu_post_meta($post_id, 'version');
     $platform = wuai_sluyu_post_meta($post_id, 'platform');
     ?>
     <section class="sluyu-resource-card<?php echo $compact ? ' is-compact' : ''; ?>"<?php if (!$compact) : ?> id="download-box"<?php endif; ?>>
-        <div class="sluyu-resource-permissions"><h3><?php echo wuai_sluyu_icon('download-cloud-line1'); ?> 下载权限</h3><dl><div><dt>游客</dt><dd>免费下载</dd></div><div><dt>注册用户</dt><dd>免费下载</dd></div></dl><p>此资源由作者公开分享</p></div>
+        <div class="sluyu-resource-permissions"><h3><?php echo wuai_sluyu_icon('download-cloud-line1'); ?> 下载权限</h3><dl><div><dt>访问范围</dt><dd><?php echo esc_html(['public'=>'公开下载','login'=>'登录用户','member'=>'有效会员'][wuai_sluyu_post_meta($post_id,'download_access','public')] ?? '公开下载'); ?></dd></div></dl><p>请遵守资源的授权范围</p></div>
         <div class="sluyu-resource-info"><h2><?php echo esc_html($options['download_title']); ?></h2><dl>
             <?php if ($version) : ?><div><dt>版本</dt><dd><?php echo esc_html($version); ?></dd></div><?php endif; ?>
             <?php if ($platform) : ?><div><dt>运行平台</dt><dd><?php echo esc_html($platform); ?></dd></div><?php endif; ?>
@@ -127,6 +135,7 @@ function wuai_sluyu_comment($comment, $args, $depth) {
             <div class="sluyu-comment-detail"><div class="sluyu-comment-byline"><strong><?php comment_author_link(); ?></strong><time datetime="<?php echo esc_attr(get_comment_date('c')); ?>"><?php echo esc_html(get_comment_date('Y-m-d H:i')); ?></time></div>
             <?php if ($comment->comment_approved === '0') : ?><p class="sluyu-comment-pending">你的评论正在等待审核。</p><?php endif; ?>
             <div class="sluyu-comment-text"><?php comment_text(); ?></div>
+            <?php $topic = get_post($comment->comment_post_ID); if ($topic && get_post_meta($topic->ID, '_wuai_topic_kind', true) === 'question' && is_user_logged_in() && ((int)$topic->post_author === get_current_user_id() || current_user_can('moderate_comments')) && $comment->comment_approved === '1') { wuai_sluyu_action_button('accept', '采纳回答', ['id'=>$comment->comment_ID]); } ?>
             <?php comment_reply_link(array_merge($args, ['depth' => $depth, 'max_depth' => $args['max_depth'], 'reply_text' => '回复', 'before' => '<div class="sluyu-comment-reply">', 'after' => '</div>'])); ?>
             </div>
         </div>

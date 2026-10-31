@@ -10,7 +10,7 @@
 - PHP 7.4+
 - 服务器启用固定链接重写（宝塔 Nginx/Apache 均可）
 
-主题可独立启用。主题设置实际接入用户提供的 Zibll 源码中的 Codestar Framework 2.2.0 核心、子比管理面板类、上传控件及样式；文章、评论和媒体使用 WordPress 功能。没有移植子比的支付、商城、授权或完整业务功能。框架来源与适配范围见 `wuai-sluyu/THIRD-PARTY.md`。
+主题可独立启用。主题设置实际接入用户提供的 Zibll 源码中的 Codestar Framework 2.2.0 核心、子比管理面板类、上传控件及样式；文章、评论和媒体使用 WordPress 功能。社区业务由本主题独立实现，商城、结算和订单对接 WooCommerce，并非移植子比的支付或授权代码。框架来源与适配范围见 `wuai-sluyu/THIRD-PARTY.md`。
 
 ## 安装
 
@@ -34,7 +34,7 @@
 发布新的 GitHub Release 时，上传顶层目录为 `wuai-sluyu` 的 ZIP，例如：
 
 ```text
-wuai-sluyu-v1.0.10.zip
+wuai-sluyu-v1.1.0.zip
 ```
 
 后台会通过 GitHub Releases API 检查新版本，不需要在主题中保存 PAT。
@@ -89,9 +89,9 @@ wuai-sluyu-v1.0.10.zip
 - 安装使用 WordPress 原生 Theme_Upgrader；更新前备份设置，校验主题包目录、版本、文件及兼容要求，支持 GitHub SHA256 校验，并发锁防止重复安装。
 - 保留 WordPress 原生更新通知与 GitHub 正式版/预发布通道；服务器连接失败不会被显示为“已是最新版”。
 
-`python tests/prepare-updater.py` prepares a disposable local WordPress fixture for `node tests/updater.cjs`. Never deploy the fixture plugin. `WP_QA_SOURCE` selects an isolated release source; `WP_QA_POLL_URL` can point to a second local PHP worker to verify concurrent progress polling and refresh recovery.
-
 ## v1.0.9
+
+`python tests/prepare-updater.py` prepares a disposable local WordPress fixture for `node tests/updater.cjs`. Never deploy the fixture plugin. `WP_QA_SOURCE` selects an isolated release source; `WP_QA_POLL_URL` can point to a second local PHP worker to verify concurrent progress polling and refresh recovery.
 
 - 合并重复的加载遮罩样式，修复圆圈被挤到屏幕左侧的问题；圆圈与站名在电脑和手机上居中。
 - 页面结构就绪后收起加载动画，不再等待背景视频、外链图片或页脚脚本；最迟约 2 秒自动结束。
@@ -104,3 +104,44 @@ wuai-sluyu-v1.0.10.zip
 - 保留 v1.0.9 的加载动画修复。
 - 后台更新状态以磁盘实际版本为准，手动上传替换成功后会收起上次中断的更新进度。
 - 无进展的更新任务在 5 分钟后提示超时，避免网关中断后长期停在下载状态。
+
+## v1.1.0：站内服务与社区功能
+
+- 增加 24 个服务页面、5 组频道和 26 个子分类入口，兼容原站 `mission/today`、分类层级与 `.html` 地址，共 98 条命名路由；普通固定链接下也可用 `?sluyu_page=mission` 等地址访问。
+- 每日签到、月历、累计与连续排行、积分流水、最多 7 天补签；任务按真实完成条件发奖。唯一事件键和数据库互斥锁避免重复领取及并发扣款。
+- 个人资料、账号收藏、关注、作者主页、文章 / 用户搜索、私信、已读状态、系统通知；审核内容与私信按身份隔离。
+- 话题、单选投票、问答与采纳、快讯、导航、文档、文章投稿、认证申请、工单反馈、管理员处理回复、用户禁言。前台提交默认为待审。
+- 注册 3 个小工具区域（首页、文章 / 页面、页脚）及 11 种可拖放小工具；保留未配置时的默认侧栏。
+- 新增本地二维码、文本统计 / 去重 / URL 编解码 / JSON 格式化、安全随机密码生成工具，不上传输入内容。
+- WooCommerce 商品、购物车、结算、订单、优惠券和会员有效期对接；付款确认后授权、重复回调不续加、退款 / 取消撤回对应授权；资源支持公开 / 登录 / 会员下载权限。
+- 保留页内在线更新器及加载动画修复。新增 WordPress 隐私导出与删除适配，删除账号时清理社区记录。
+
+### 启用与配置
+
+1. 更新主题后进入一次 WordPress 后台，使新版重写规则生效。也可以到“设置 → 固定链接”保存。
+2. 进入“吾爱森鹿语 → 站内服务管理”。页面无需预创建即可访问；点击“创建缺失的页面与分类”会在 WordPress 中生成可编辑页面，但不会覆盖已有页面、分类或文章。
+3. 在“主题设置 → 社区与商城”配置签到积分、补签费用。前台入口已指向实际服务页，原有自定义链接仍优先使用。
+4. 在“外观 → 小工具”拖放“森鹿语 · 功能小工具”并选择类型；在后台新增的内容菜单中审核话题、快讯、导航、认证和工单。
+5. 启用商城时单独安装 WooCommerce，配置货币、收货 / 邮箱、结算页和支付网关，关闭其“即将推出”模式后才对访客开放。插件本身及支付服务不打包进主题。
+6. 会员商品使用 WooCommerce 简单虚拟商品，在商品页填写“吾爱会员有效天数”（正数=天数，-1=长期，0=普通商品），再将商品 ID 填入主题设置。不要仅修改商品描述来授予会员。
+7. 文章编辑中的“下载权限”决定下载卡片权限；权限不足时，网盘地址和提取码不会输出到页面。该控制不覆盖管理员自行写在正文中的链接，也不为外部网盘提供防转发能力。
+
+### 业务边界
+
+抓取目录只有前端页面，没有原站服务器接口、支付密钥、数据库或用户数据。本版覆盖主要公开页面和基础交互，但并不声称完整复刻原站 B2 的所有商业规则。高级付费圈子、积分 / 现金悬赏、猜答案解锁、多选 / PK 投票、供求交易、邀请码、用户头像 / 封面上传、余额充值提现和视频付费阅读尚未实现。现金支付依赖 WooCommerce 支付插件及商户配置，正式上线前必须完成支付渠道沙盒和退款验收；本地测试没有执行外部支付。
+
+积分不是现金，不承诺兑换会员或下载加速。补签费用会扣除积分，不能反复补签同一缺口。部分退款也会撤销该订单的会员授权（保守策略）；其他订单的有效权益保留。任务与积分流水在隐私删除时说明保留原因，删除账号时清理；支付记录由 WooCommerce 的隐私政策处理。
+
+更多逐项范围见 `FEATURES.md`。已有内容不会被自动导入演示文章，也不会复制参考站用户、交易、邀请码和个人联系信息。
+
+### 新增验证
+
+在独立测试 WordPress 中设置 `WP_QA_ROOT`，运行 `php tests/community-fixture.php`（仅允许 `127.0.0.1:8771` 的测试站）。
+
+- `node tests/community.cjs`：98 条路由、移动端、工具、签到幂等、任务、资料、收藏、关注、投票、私信隔离及待审可见性。
+- `node tests/community-admin.cjs`：后台服务页面、CSF 字段、小工具入口、页面初始化幂等及管理员 / nonce 校验。
+- `php tests/community-state.php`：补签扣费、连续天数、认证审核 / 撤销、禁言、隐私导出删除、小工具和重写优先级。
+- `php tests/commerce.php`：真实 WooCommerce 本地订单的付款、续期、重复回调、部分 / 全额退款、取消和长期会员生命周期；不调用真实支付渠道。
+- `node tests/commerce-browser.cjs`：会员商品 → 加入购物车 → WooCommerce 原生购物车 → 手机结算页，不提交付款。
+
+以上均为隔离站测试，不连接正式站点。`PLAYWRIGHT_MODULE` 与 `BROWSER_EXECUTABLE` 可指定现有测试运行库。

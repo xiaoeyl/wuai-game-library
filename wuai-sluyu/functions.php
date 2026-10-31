@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WUAI_SLUYU_VERSION', '1.0.10');
+define('WUAI_SLUYU_VERSION', '1.1.0');
 define('WUAI_SLUYU_DIR', get_stylesheet_directory());
 define('WUAI_SLUYU_URI', get_stylesheet_directory_uri());
 
@@ -12,22 +12,33 @@ require_once WUAI_SLUYU_DIR . '/inc/meta.php';
 require_once WUAI_SLUYU_DIR . '/inc/admin-options.php';
 require_once WUAI_SLUYU_DIR . '/inc/github-updater.php';
 require_once WUAI_SLUYU_DIR . '/inc/frontend.php';
+require_once WUAI_SLUYU_DIR . '/inc/portal.php';
+require_once WUAI_SLUYU_DIR . '/inc/community.php';
+require_once WUAI_SLUYU_DIR . '/inc/portal-views.php';
+require_once WUAI_SLUYU_DIR . '/inc/commerce.php';
+require_once WUAI_SLUYU_DIR . '/inc/services-admin.php';
+require_once WUAI_SLUYU_DIR . '/inc/widgets.php';
+require_once WUAI_SLUYU_DIR . '/inc/privacy.php';
 
 add_action('wp_enqueue_scripts', function () {
     wp_enqueue_style('wuai-sluyu', get_stylesheet_uri(), [], WUAI_SLUYU_VERSION);
     wp_enqueue_style('wuai-sluyu-theme', WUAI_SLUYU_URI . '/assets/css/theme.css', ['wuai-sluyu'], WUAI_SLUYU_VERSION);
     wp_enqueue_style('wuai-sluyu-icons', wuai_sluyu_asset('vendor/sluyu-icons/css/iconfont.css'), [], WUAI_SLUYU_VERSION);
     wp_enqueue_style('wuai-sluyu-layout', wuai_sluyu_asset('css/layout.css'), ['wuai-sluyu-theme', 'wuai-sluyu-icons'], WUAI_SLUYU_VERSION);
+    wp_enqueue_style('wuai-sluyu-portal', wuai_sluyu_asset('css/portal.css'), ['wuai-sluyu-layout'], WUAI_SLUYU_VERSION);
     wp_enqueue_script('wuai-sluyu-qr', wuai_sluyu_asset('vendor/qrious/qrious.min.js'), [], '4.0.2', true);
-    wp_enqueue_script('wuai-sluyu-interactions', wuai_sluyu_asset('js/interactions.js'), ['wuai-sluyu-qr'], WUAI_SLUYU_VERSION, true);
+    wp_enqueue_script('wuai-sluyu-interactions', wuai_sluyu_asset('js/interactions.js'), ['wuai-sluyu-qr', 'wuai-sluyu'], WUAI_SLUYU_VERSION, true);
     if (is_singular() && comments_open() && get_option('thread_comments')) {
         wp_enqueue_script('comment-reply');
     }
     wp_enqueue_script('wuai-sluyu', WUAI_SLUYU_URI . '/assets/js/theme.js', [], WUAI_SLUYU_VERSION, true);
+    wp_enqueue_script('wuai-sluyu-community', wuai_sluyu_asset('js/community.js'), ['wuai-sluyu', 'wuai-sluyu-qr'], WUAI_SLUYU_VERSION, true);
     wp_localize_script('wuai-sluyu', 'wuaiSluyu', [
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('wuai_sluyu'),
         'defaultImage' => wuai_sluyu_asset('images/default.jpg'),
+        'loggedIn' => is_user_logged_in(),
+        'accountUrl' => wuai_sluyu_portal_url('account'),
     ]);
 });
 
@@ -83,14 +94,14 @@ add_action('init', function () {
 });
 
 add_filter('post_link', function ($url, $post) {
-    if ($post instanceof WP_Post && $post->post_type === 'post' && wuai_sluyu_option('legacy_html_links', '1')) {
+    if ($post instanceof WP_Post && $post->post_type === 'post' && get_option('permalink_structure') && wuai_sluyu_option('legacy_html_links', '1')) {
         return home_url('/' . $post->ID . '.html');
     }
     return $url;
 }, 10, 2);
 
 add_filter('page_link', function ($url, $post_id) {
-    if (wuai_sluyu_option('legacy_html_links', '1')) {
+    if (get_option('permalink_structure') && wuai_sluyu_option('legacy_html_links', '1')) {
         $post = get_post($post_id);
         if ($post instanceof WP_Post && $post->post_name) {
             return home_url('/' . $post->post_name . '.html');

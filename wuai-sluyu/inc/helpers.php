@@ -44,13 +44,13 @@ function wuai_sluyu_post_meta($post_id = 0, $key = '', $default = '') {
 function wuai_sluyu_nav_fallback() {
     return [
         ['首页', home_url('/')],
-        ['茶话会', get_permalink(get_option('page_for_posts')) ?: home_url('/forums/')],
-        ['资讯', get_category_link(get_cat_ID('资讯')) ?: home_url('/category/news/')],
-        ['游戏', get_category_link(get_cat_ID('游戏资源')) ?: home_url('/category/games/')],
-        ['图包', get_category_link(get_cat_ID('图包')) ?: home_url('/category/image/')],
-        ['美图', get_category_link(get_cat_ID('美图')) ?: home_url('/category/photo/')],
-        ['合集', get_category_link(get_cat_ID('合集')) ?: home_url('/category/collection/')],
-        ['更多', home_url('/more/')],
+        ['茶话会', wuai_sluyu_portal_url('circle')],
+        ['资讯', wuai_sluyu_portal_url('webxw')],
+        ['游戏', wuai_sluyu_portal_url('pcgame')],
+        ['图包', wuai_sluyu_portal_url('tuimg')],
+        ['美图', wuai_sluyu_portal_url('xiezhenji')],
+        ['合集', wuai_sluyu_portal_url('cosheji')],
+        ['更多', wuai_sluyu_portal_url('more')],
     ];
 }
 

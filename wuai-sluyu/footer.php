@@ -29,6 +29,7 @@ $vip_url = wuai_sluyu_page_link('rail_vip_url', ['vips', 'vip']);
 ?>
 <?php if ($theme_options['footer_banner']) : ?><div class="sluyu-container sluyu-footer-banner-wrap"><?php wuai_sluyu_banner($theme_options['footer_banner'], $theme_options['footer_banner_url']); ?></div><?php endif; ?>
 <footer class="sluyu-footer sluyu-footer-reference">
+    <?php if (is_active_sidebar('sluyu-footer')) : ?><div class="sluyu-container sluyu-footer-widgets"><?php dynamic_sidebar('sluyu-footer'); ?></div><?php endif; ?>
     <div class="sluyu-container sluyu-footer-inner">
         <div class="sluyu-footer-brand">
             <a class="sluyu-footer-logo" href="<?php echo esc_url(home_url('/')); ?>"><img src="<?php echo esc_url($logo); ?>" alt="<?php echo esc_attr($theme_options['site_title']); ?>"></a>
@@ -77,7 +78,7 @@ $vip_url = wuai_sluyu_page_link('rail_vip_url', ['vips', 'vip']);
 <template id="sluyu-panel-message"><div class="sluyu-service-empty"><?php echo wuai_sluyu_icon('mail-send-line'); ?><p>暂无私信服务</p><small>需要联系作者时，可在文章下方留言。</small></div></template>
 <template id="sluyu-panel-checkin"><div class="sluyu-checkin-panel"><?php echo wuai_sluyu_icon('gift-2-line'); ?><h3>每日签到</h3><?php if (is_user_logged_in()) : ?><p>累计签到 <strong data-checkin-days><?php echo esc_html((int) get_user_meta(get_current_user_id(), '_wuai_sluyu_checkin_days', true)); ?></strong> 天</p><button class="sluyu-action-primary" type="button" data-sluyu-checkin><?php echo get_user_meta(get_current_user_id(), '_wuai_sluyu_checkin_date', true) === wp_date('Y-m-d') ? '今日已签到' : '立即签到'; ?></button><?php else : ?><p>登录后记录每日签到。</p><a class="sluyu-action-primary" href="<?php echo esc_url(wp_login_url(home_url('/'))); ?>">登录后签到</a><?php endif; ?></div></template>
 <template id="sluyu-panel-qrcode"><div class="sluyu-qr-list"><div><canvas data-sluyu-qr></canvas><p>扫码打开当前页</p></div><?php if ($theme_options['rail_group_qr']) : ?><div><img src="<?php echo esc_url($theme_options['rail_group_qr']); ?>" alt="社群二维码"><p>加入社群</p></div><?php endif; ?></div></template>
-<template id="sluyu-panel-support"><p><?php echo nl2br(esc_html($theme_options['rail_support_text'])); ?></p></template>
+<template id="sluyu-panel-support"><p><?php echo nl2br(esc_html($theme_options['rail_support_text'])); ?></p><a class="sluyu-action-primary" href="<?php echo esc_url(wuai_sluyu_portal_url('submit',['kind'=>'ticket'])); ?>">提交工单 / 资源反馈</a></template>
 <template id="sluyu-panel-about"><p><?php echo esc_html($theme_options['footer_description']); ?></p><p><?php echo esc_html($theme_options['footer_text']); ?></p></template>
 <template id="sluyu-panel-terms"><p>用户说明尚未发布。浏览和使用资源前，请查看文章中的使用说明及原作者的授权要求。</p></template>
 <template id="sluyu-panel-disclaimer"><p>请遵守资源原作者的授权范围。链接失效或内容存在问题时，请在文章下留言反馈。</p></template>

@@ -17,6 +17,9 @@ function wuai_sluyu_resource_box($post) {
         'title_badge' => '标题徽章（如：热门）',
     ];
     echo '<div class="wuai-sluyu-meta-box">';
+    echo '<p><label>下载权限<select name="wuai_sluyu_download_access" class="widefat">';
+    foreach (['public'=>'公开下载','login'=>'登录后下载','member'=>'有效会员下载'] as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected(wuai_sluyu_post_meta($post->ID,'download_access','public'),$value,false) . '>' . esc_html($label) . '</option>'; }
+    echo '</select></label></p>';
     foreach ($fields as $key => $label) {
         $value = get_post_meta($post->ID, '_wuai_sluyu_' . $key, true);
         printf('<p><label for="wuai_sluyu_%1$s">%2$s</label><input type="text" id="wuai_sluyu_%1$s" name="wuai_sluyu_%1$s" value="%3$s" class="widefat"></p>', esc_attr($key), esc_html($label), esc_attr($value));
@@ -43,6 +46,10 @@ add_action('save_post', function ($post_id) {
             $value = wp_unslash($_POST['wuai_sluyu_' . $key]);
             update_post_meta($post_id, '_wuai_sluyu_' . $key, $key === 'download_url' ? esc_url_raw($value, ['http', 'https']) : sanitize_text_field($value));
         }
+    }
+    if (isset($_POST['wuai_sluyu_download_access'])) {
+        $access = sanitize_key($_POST['wuai_sluyu_download_access']);
+        update_post_meta($post_id, '_wuai_sluyu_download_access', in_array($access,['public','login','member'],true) ? $access : 'public');
     }
     if (isset($_POST['wuai_sluyu_title_badge_color'])) {
         $color = sanitize_hex_color(wp_unslash($_POST['wuai_sluyu_title_badge_color']));

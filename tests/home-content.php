@@ -29,6 +29,9 @@ function get_permalink($id = 0) { return $id ? home_url('/' . $id . '.html') : '
 function wp_login_url() { return home_url('/login/'); }
 function is_user_logged_in() { return true; }
 function get_edit_profile_url() { return home_url('/profile/'); }
+function wuai_sluyu_portal_url($key) { return home_url('/' . $key . '/'); }
+function is_active_sidebar($id) { return false; }
+function absint($value) { return abs((int)$value); }
 function get_header() {}
 function get_footer() {}
 function esc_html($text) { return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8'); }

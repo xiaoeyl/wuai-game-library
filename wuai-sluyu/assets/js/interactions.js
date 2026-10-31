@@ -62,7 +62,7 @@
       checkin.disabled = true;
       api('checkin').then(function (data) {
         checkin.textContent = '今日已签到';
-        dialog.querySelector('[data-checkin-days]').textContent = data.days;
+        document.querySelectorAll('[data-checkin-days]').forEach(function (element) { element.textContent = data.days; });
         toast(data.message);
       }).catch(function (error) { toast(error.message); }).finally(function () { checkin.disabled = false; });
     }
@@ -77,6 +77,17 @@
     }
     var bookmark = event.target.closest('[data-sluyu-bookmark]');
     if (bookmark) {
+      if (window.wuaiSluyu && window.wuaiSluyu.loggedIn) {
+        if (bookmark.disabled) return;
+        bookmark.disabled = true;
+        var fields = new URLSearchParams({action:'wuai_sluyu_community', nonce:window.wuaiSluyu.nonce, operation:'bookmark', id:bookmark.dataset.sluyuBookmark});
+        fetch(window.wuaiSluyu.ajaxUrl, {method:'POST', credentials:'same-origin', body:fields}).then(function (response) {return response.json();}).then(function (result) {
+          if (!result.success) throw new Error(result.data && result.data.message || '收藏失败');
+          document.querySelectorAll('[data-sluyu-bookmark="'+bookmark.dataset.sluyuBookmark+'"]').forEach(function (button) {button.setAttribute('aria-pressed', String(result.data.selected));});
+          toast(result.data.selected?'已收藏到你的账号':'已取消收藏');
+        }).catch(function (error) {toast(error.message);}).finally(function () {bookmark.disabled=false;});
+        return;
+      }
       try {
         var key = 'sluyu-bookmark-' + bookmark.dataset.sluyuBookmark;
         var selected = localStorage.getItem(key) !== '1';
@@ -102,6 +113,7 @@
     }
   });
   document.querySelectorAll('[data-sluyu-bookmark]').forEach(function (button) {
+    if (window.wuaiSluyu && window.wuaiSluyu.loggedIn) return;
     try {button.setAttribute('aria-pressed',localStorage.getItem('sluyu-bookmark-'+button.dataset.sluyuBookmark)==='1'?'true':'false');} catch (error) { /* Storage may be blocked. */ }
   });
   var toc = document.querySelector('.sluyu-toc');

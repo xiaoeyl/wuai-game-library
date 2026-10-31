@@ -50,9 +50,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.WP_LAYOUT_FIXTURE || path
     await page.locator('.sluyu-reference-rail [data-sluyu-panel=qrcode]').click();
     assert.equal(await page.locator('[data-sluyu-qr]').evaluate(canvas => canvas.width), 320);
     await page.locator('[data-sluyu-close]').click();
-    await page.locator('.sluyu-footer-column [data-sluyu-panel=help]').click();
-    assert.match(await page.locator('.sluyu-dialog-body').innerText(), /立即下载/);
-    await page.keyboard.press('Escape');
+    const helpLink = page.locator('.sluyu-footer-column a').filter({hasText:'帮助文档'});
+    assert.match(await helpLink.getAttribute('href'), /document|page_id|sluyu_page/);
     await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
     await page.screenshot({ path: path.join(output, 'footer-desktop.png') });
     assert.equal(await page.locator('a[href*="/wp-admin"]').count(), 0, 'Public page does not expose backend links.');
@@ -79,7 +78,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.WP_LAYOUT_FIXTURE || path
     await page.goto(base + '/wp-login.php');
     await page.locator('#user_login').fill('qa_subscriber');
     await page.locator('#user_pass').fill('qa-local-only');
-    await Promise.all([page.waitForURL(/wp-admin/), page.locator('#wp-submit').click()]);
+    await Promise.all([page.waitForURL(url=>!url.pathname.includes('wp-login.php')), page.locator('#wp-submit').click()]);
     await page.goto(base + '/?p=' + fixture.article);
     const token = await page.evaluate(() => wuaiSluyu.nonce);
     async function action(operation, extra = {}) {

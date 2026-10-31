@@ -43,17 +43,25 @@ $seo_description = !empty($options['seo_description']) ? $options['seo_descripti
             <a class="sluyu-logo" href="<?php echo esc_url(home_url('/')); ?>" aria-label="<?php bloginfo('name'); ?>"><img src="<?php echo esc_url(wuai_sluyu_asset('images/logo.png')); ?>" alt="<?php bloginfo('name'); ?>"></a>
         <?php endif; ?>
         <nav class="sluyu-nav" aria-label="主导航">
+            <?php if (!empty($locations['primary'])) : wp_nav_menu(['theme_location'=>'primary','container'=>false,'fallback_cb'=>false,'depth'=>3]); else : ?>
             <?php foreach ($nav_items as $item) : ?>
                 <?php $nav_icons = ['首页' => '⌂', '茶话会' => '◉', '资讯' => '▤', '游戏' => '🎮', '图包' => '✦', '美图' => '▣', '合集' => '✿', '更多' => '☷']; ?>
+                <div class="sluyu-nav-item">
                 <a href="<?php echo esc_url($item[1]); ?>" class="<?php echo esc_attr(sanitize_title($item[0])); ?>"><span class="sluyu-nav-icon" aria-hidden="true"><?php echo esc_html($nav_icons[$item[0]] ?? ''); ?></span><?php echo esc_html($item[0]); ?></a>
+                <?php $groups=['资讯'=>'webxw','游戏'=>'pcgame','图包'=>'tuimg','美图'=>'xiezhenji','合集'=>'cosheji']; $children=[];
+                if(isset($groups[$item[0]])) { $children=wuai_sluyu_channels()[$groups[$item[0]]][2]; }
+                if($item[0]==='更多') { foreach(wuai_sluyu_portal_pages() as $slug=>$info) { if($slug!=='more')$children[$slug]=$info[0]; } }
+                if($children) : ?><div class="sluyu-nav-submenu"><?php foreach($children as $slug=>$label) : ?><a href="<?php echo esc_url(wuai_sluyu_portal_url($slug)); ?>"><?php echo esc_html($label); ?></a><?php endforeach; ?></div><?php endif; ?>
+                </div>
             <?php endforeach; ?>
+            <?php endif; ?>
         </nav>
         <div class="sluyu-header-actions">
             <form class="sluyu-header-search" role="search" method="get" action="<?php echo esc_url(home_url('/')); ?>">
-                <span>文章</span><input type="search" name="s" placeholder="搜索" value="<?php echo esc_attr(get_search_query()); ?>"><button type="submit" aria-label="搜索">⌕</button>
+                <select name="type" aria-label="搜索类型"><option value="post">文章</option><option value="user">用户</option></select><input type="search" name="s" placeholder="搜索" value="<?php echo esc_attr(get_search_query()); ?>"><button type="submit" aria-label="搜索">⌕</button>
             </form>
             <?php if (is_user_logged_in()) : ?>
-                <a class="sluyu-login" href="#sluyu-dialog" data-sluyu-panel="account"><?php echo esc_html(wp_get_current_user()->display_name); ?></a>
+                <a class="sluyu-login" href="<?php echo esc_url(wuai_sluyu_portal_url('account')); ?>"><?php echo esc_html(wp_get_current_user()->display_name); ?></a>
             <?php else : ?>
                 <a class="sluyu-login" href="<?php echo esc_url(wp_login_url()); ?>">登录 | 注册</a>
             <?php endif; ?>
