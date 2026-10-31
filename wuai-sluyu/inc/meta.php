@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
 }
 
 add_action('add_meta_boxes', function () {
-    add_meta_box('wuai_sluyu_resource', '游戏资源信息', 'wuai_sluyu_resource_box', ['post', 'page'], 'side', 'default');
+    if(current_user_can('edit_others_posts'))add_meta_box('wuai_sluyu_resource', '游戏资源信息', 'wuai_sluyu_resource_box', ['post', 'page','sluyu_topic'], 'side', 'default');
 });
 
 function wuai_sluyu_resource_box($post) {
@@ -18,8 +18,9 @@ function wuai_sluyu_resource_box($post) {
     ];
     echo '<div class="wuai-sluyu-meta-box">';
     echo '<p><label>下载权限<select name="wuai_sluyu_download_access" class="widefat">';
-    foreach (['public'=>'公开下载','login'=>'登录后下载','member'=>'有效会员下载'] as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected(wuai_sluyu_post_meta($post->ID,'download_access','public'),$value,false) . '>' . esc_html($label) . '</option>'; }
+    foreach (wuai_sluyu_download_modes() as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected(wuai_sluyu_post_meta($post->ID,'download_access','public'),$value,false) . '>' . esc_html($label) . '</option>'; }
     echo '</select></label></p>';
+    wuai_sluyu_download_admin_fields($post);
     foreach ($fields as $key => $label) {
         $value = get_post_meta($post->ID, '_wuai_sluyu_' . $key, true);
         printf('<p><label for="wuai_sluyu_%1$s">%2$s</label><input type="text" id="wuai_sluyu_%1$s" name="wuai_sluyu_%1$s" value="%3$s" class="widefat"></p>', esc_attr($key), esc_html($label), esc_attr($value));
@@ -38,18 +39,15 @@ add_action('save_post', function ($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
         return;
     }
-    if (!current_user_can('edit_post', $post_id)) {
+    if (!current_user_can('edit_post', $post_id) || !current_user_can('edit_others_posts')) {
         return;
     }
-    foreach (['version', 'platform', 'download_url', 'download_password', 'title_badge'] as $key) {
+    wuai_sluyu_download_save_fields($post_id);
+    foreach (['version', 'platform', 'title_badge'] as $key) {
         if (isset($_POST['wuai_sluyu_' . $key])) {
             $value = wuai_sluyu_input('wuai_sluyu_' . $key);
             update_post_meta($post_id, '_wuai_sluyu_' . $key, $key === 'download_url' ? esc_url_raw($value, ['http', 'https']) : sanitize_text_field($value));
         }
-    }
-    if (isset($_POST['wuai_sluyu_download_access'])) {
-        $access = sanitize_key(wuai_sluyu_input('wuai_sluyu_download_access'));
-        update_post_meta($post_id, '_wuai_sluyu_download_access', in_array($access,['public','login','member'],true) ? $access : 'public');
     }
     if (isset($_POST['wuai_sluyu_title_badge_color'])) {
         $color = sanitize_hex_color(wuai_sluyu_input('wuai_sluyu_title_badge_color'));

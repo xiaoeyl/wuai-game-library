@@ -116,12 +116,12 @@ add_filter('wuai_sluyu_community_dispatch', function ($result, $operation, $uid)
         if (is_wp_error($permission)) { return $permission; }
         if ($operation === 'delete_submission') {
             $deleted = wp_trash_post($id);
-            return $deleted && !is_wp_error($deleted) ? ['message'=>'非公开稿件已删除。','reload'=>true] : new WP_Error('submission_delete', '删除失败，请稍后重试。');
+            return $deleted && !is_wp_error($deleted) && get_post_status($id)==='trash' ? ['message'=>'非公开稿件已删除。','reload'=>true] : new WP_Error('submission_delete', '删除失败，请稍后重试。');
         }
         if ($operation === 'withdraw_submission') {
             if ($post->post_status === 'draft') { return ['message'=>'稿件已经是草稿。','reload'=>true]; }
             $saved = wp_update_post(['ID'=>$id,'post_status'=>'draft'], true);
-            return is_wp_error($saved) ? $saved : ($saved ? ['message'=>'稿件已撤回为草稿，不再公开展示。','reload'=>true] : new WP_Error('submission_storage', '撤回失败，请刷新核对状态。'));
+            return is_wp_error($saved) ? $saved : ($saved && get_post_status($id)==='draft' ? ['message'=>'稿件已撤回为草稿，不再公开展示。','reload'=>true] : new WP_Error('submission_storage', '撤回失败，请刷新核对状态。'));
         }
         $version = wuai_sluyu_input('version');
         if (!preg_match('/^[a-f0-9]{64}$/', $version) || !hash_equals(wuai_sluyu_account_submission_version($post), $version)) {
@@ -132,7 +132,7 @@ add_filter('wuai_sluyu_community_dispatch', function ($result, $operation, $uid)
         if (!$title || mb_strlen($title) > ($post->post_type === 'sluyu_verify' ? 30 : 120) || mb_strlen(trim(wp_strip_all_tags($body))) < 5 || mb_strlen($body) > 20000) {
             return new WP_Error('submission_content', '请填写有效标题和 5–20000 字正文；认证称号最多 30 字，其余标题最多 120 字。');
         }
-        $update = ['ID'=>$id,'post_title'=>$title,'post_content'=>$body,'post_status'=>'pending'];
+        $update = ['ID'=>$id,'post_title'=>$title,'post_content'=>$body,'post_status'=>'draft'];
         if (in_array($post->post_type, ['sluyu_news','sluyu_link'], true)) {
             $url = esc_url_raw(wuai_sluyu_input('url'), ['http','https']);
             if ($post->post_type === 'sluyu_link' && (!$url || !wp_http_validate_url($url))) { return new WP_Error('submission_url', '请输入有效的公网 HTTP/HTTPS 网址。'); }
@@ -141,6 +141,11 @@ add_filter('wuai_sluyu_community_dispatch', function ($result, $operation, $uid)
         $saved = wp_update_post(wp_slash($update), true);
         if (is_wp_error($saved)) { return $saved; }
         if (!$saved) { return new WP_Error('submission_storage', '保存失败，请刷新核对状态。'); }
+        if (!wuai_sluyu_saved_meta_matches($id,$update['meta_input']??[])) {
+            return new WP_Error('submission_partial','稿件附加信息未完整保存，暂留草稿，请保留修改内容并联系管理员核对。');
+        }
+        $queued=wp_update_post(['ID'=>$id,'post_status'=>'pending'],true);
+        if (is_wp_error($queued) || get_post_status($id)!=='pending') { return new WP_Error('submission_queue','稿件未进入审核队列，请刷新核对并联系管理员。'); }
         wuai_sluyu_notify($uid, '你修改的「' . $title . '」已重新提交审核，审核前不公开展示。');
         do_action('wuai_sluyu_after_submission_edit', $id, $uid);
         return ['message'=>'已保存并重新提交审核；类型、分组和投票设置保持不变。','reload'=>true];
@@ -162,6 +167,7 @@ function wuai_sluyu_account_edit_form($id, $uid) {
     echo '<label>标题<input name="title" value="' . esc_attr($post->post_title) . '" maxlength="' . ($post->post_type === 'sluyu_verify' ? 30 : 120) . '" required></label><label>正文（支持安全的基础 HTML 排版）<textarea name="body" rows="12" minlength="5" maxlength="20000" required>' . esc_textarea($post->post_content) . '</textarea></label>';
     if (in_array($post->post_type, ['sluyu_news','sluyu_link'], true)) { echo '<label>来源 / 站点网址<input name="url" type="url" value="' . esc_attr(get_post_meta($id, '_wuai_source_url', true)) . '"' . ($post->post_type === 'sluyu_link' ? ' required' : '') . '></label>'; }
     wuai_sluyu_form_end('保存并重新提交审核');
+    if(function_exists('wuai_sluyu_protected_view')) { echo wuai_sluyu_protected_view($id,true); }
     echo '<p><a href="' . esc_url(wuai_sluyu_portal_url('account', ['tab'=>'submissions'])) . '">返回投稿列表</a></p></section>';
 }
 

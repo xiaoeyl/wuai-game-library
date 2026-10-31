@@ -72,7 +72,7 @@ function wuai_sluyu_frontend_action() {
     if ($operation === 'like') {
         $post_id = absint(wuai_sluyu_input('post_id'));
         $post = get_post($post_id);
-        if (!$post || !in_array($post->post_type, ['post','sluyu_topic','sluyu_news','sluyu_link'], true) || $post->post_status !== 'publish' || post_password_required($post)) {
+        if (!$post || !in_array($post->post_type, ['post','sluyu_topic','sluyu_news','sluyu_link','sluyu_listing'], true) || $post->post_status !== 'publish' || post_password_required($post)) {
             wp_send_json_error(['message' => '这篇文章暂时无法操作。'], 403);
         }
         $key = '_wuai_sluyu_like_' . $post_id;
@@ -101,31 +101,31 @@ add_action('template_redirect', function () {
     }
 });
 
-function wuai_sluyu_download_card($post_id, $compact = false) {
+function wuai_sluyu_download_card($post_id, $compact = false, $instance_id = '') {
     $options = wuai_sluyu_get_options();
     $url = wuai_sluyu_post_meta($post_id, 'download_url');
     if (!$url || $options['show_resource_box'] !== '1' || post_password_required($post_id)) {
         return;
     }
     if (!wuai_sluyu_resource_access($post_id)) {
-        $member = wuai_sluyu_post_meta($post_id, 'download_access') === 'member';
-        echo '<section class="sluyu-panel sluyu-resource-locked" id="' . ($compact ? 'download-sidebar' : 'download-box') . '"><h3>下载权限</h3><p>' . ($member ? '此资源需要有效会员权限。' : '登录后可下载此资源。') . '</p><a class="sluyu-action-primary" href="' . esc_url(is_user_logged_in() ? wuai_sluyu_portal_url('vips') : wp_login_url(get_permalink($post_id))) . '">' . (is_user_logged_in() ? '查看会员计划' : '登录后继续') . '</a></section>';
+        wuai_sluyu_download_gate($post_id,$compact,$instance_id);
         return;
     }
+    $handoff=wuai_sluyu_download_handoff($post_id);
     $code = wuai_sluyu_post_meta($post_id, 'download_password');
     $version = wuai_sluyu_post_meta($post_id, 'version');
     $platform = wuai_sluyu_post_meta($post_id, 'platform');
     ?>
     <section class="sluyu-resource-card<?php echo $compact ? ' is-compact' : ''; ?>"<?php if (!$compact) : ?> id="download-box"<?php endif; ?>>
-        <div class="sluyu-resource-permissions"><h3><?php echo wuai_sluyu_icon('download-cloud-line1'); ?> 下载权限</h3><dl><div><dt>访问范围</dt><dd><?php echo esc_html(['public'=>'公开下载','login'=>'登录用户','member'=>'有效会员'][wuai_sluyu_post_meta($post_id,'download_access','public')] ?? '公开下载'); ?></dd></div></dl><p>请遵守资源的授权范围</p></div>
+        <div class="sluyu-resource-permissions"><h3><?php echo wuai_sluyu_icon('download-cloud-line1'); ?> 下载权限</h3><dl><div><dt>访问范围</dt><dd><?php echo esc_html(wuai_sluyu_download_modes()[wuai_sluyu_post_meta($post_id,'download_access','public')] ?? '权限待核对'); ?></dd></div></dl><p>请遵守资源的授权范围</p></div>
         <div class="sluyu-resource-info"><h2><?php echo esc_html($options['download_title']); ?></h2><dl>
             <?php if ($version) : ?><div><dt>版本</dt><dd><?php echo esc_html($version); ?></dd></div><?php endif; ?>
             <?php if ($platform) : ?><div><dt>运行平台</dt><dd><?php echo esc_html($platform); ?></dd></div><?php endif; ?>
             <div><dt>下载方式</dt><dd>网盘下载</dd></div><?php if ($code) : ?><div><dt>提取码</dt><dd><?php echo esc_html($code); ?></dd></div><?php endif; ?>
         </dl><p class="sluyu-download-access"><?php echo wuai_sluyu_icon('check-line'); ?> 您已获得下载权限</p>
-        <div class="sluyu-download-actions"><a class="sluyu-action-primary" href="<?php echo esc_url($url); ?>" target="_blank" rel="nofollow noopener"><?php echo wuai_sluyu_icon('download-cloud-line'); ?> 立即下载</a>
-            <button type="button" class="sluyu-action-plain" data-sluyu-copy="<?php echo esc_attr($code ?: $url); ?>" data-copy-success="已复制"><?php echo $code ? '复制提取码' : '复制链接'; ?></button>
-        </div><p class="sluyu-download-note">下载前请阅读文章说明，链接失效可在评论区反馈。</p></div>
+        <div class="sluyu-download-actions"><a class="sluyu-action-primary" href="<?php echo esc_url($handoff); ?>" target="_blank" rel="nofollow noopener noreferrer"><?php echo wuai_sluyu_icon('download-cloud-line'); ?> 立即下载</a>
+            <button type="button" class="sluyu-action-plain" data-sluyu-copy="<?php echo esc_attr($code ?: $handoff); ?>" data-copy-success="已复制"><?php echo $code ? '复制提取码' : '复制临时入口'; ?></button>
+        </div><p class="sluyu-download-note">本站跳转入口 5 分钟内有效，使用时再次检查权限。外部网盘与已取得的链接不受本站控制。</p></div>
     </section>
     <?php
 }

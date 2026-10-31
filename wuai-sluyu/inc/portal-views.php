@@ -24,7 +24,7 @@ function wuai_sluyu_portal_pagination($total, $key, $page_key = 'pg', $extra = [
 }
 
 function wuai_sluyu_render_portal($key) {
-    $handlers = ['account'=>'account_extended','mission'=>'mission','task'=>'task','gold'=>'gold','directmessage'=>'messages_extended','message'=>'messages_extended','verify'=>'verify','dark-room'=>'bans','submit'=>'submit','tools'=>'tools','document'=>'documents','more'=>'directory','circle'=>'feed','circles'=>'circles','newsflashes'=>'feed','links'=>'feed'];
+    $handlers = ['account'=>'account_extended','mission'=>'mission','task'=>'task','gold'=>'gold','directmessage'=>'messages_extended','message'=>'messages_extended','verify'=>'verify','dark-room'=>'bans','submit'=>'submit','tools'=>'tools','document'=>'documents','more'=>'directory','circle'=>'feed','circles'=>'circles','listings'=>'listings','invitations'=>'invitations','newsflashes'=>'feed','links'=>'feed'];
     if (isset($handlers[$key])) { call_user_func('wuai_sluyu_view_' . $handlers[$key], $key); }
     elseif (in_array($key,['shop','carts','orders','coupons','vips'],true)) { wuai_sluyu_view_commerce($key); }
     elseif (isset(wuai_sluyu_portal_pages()[$key])) { wuai_sluyu_view_information($key); }
@@ -77,12 +77,12 @@ function wuai_sluyu_view_task() {
 
 function wuai_sluyu_view_gold() {
     if (!wuai_sluyu_require_login()) { return; }
-    $uid=get_current_user_id(); $page=wuai_sluyu_page_number();
-    echo '<section class="sluyu-panel"><p>可用积分</p><h2 class="sluyu-big-number">' . wuai_sluyu_points($uid) . '</h2><p>积分由签到和任务获得，可用于补签。积分不是现金，不支持提现或兑换承诺。</p><a href="' . esc_url(wuai_sluyu_portal_url('orders')) . '">查看真实支付订单 →</a></section><section class="sluyu-panel"><h2>积分流水</h2><div class="sluyu-table-wrap"><table><thead><tr><th>时间</th><th>说明</th><th>积分变动</th></tr></thead><tbody>';
-    $events=wuai_sluyu_events($uid,'',30,($page-1)*30);
-    foreach($events as $entry) { if(!$entry->points)continue; echo '<tr><td>' . esc_html($entry->created_at) . '</td><td>' . esc_html($entry->payload) . '</td><td>' . ($entry->points>0?'+':'') . (int)$entry->points . '</td></tr>'; }
+    global $wpdb; $uid=get_current_user_id(); $page=wuai_sluyu_page_number();
+    echo '<section class="sluyu-panel"><p>可用积分</p><h2 class="sluyu-big-number">' . wuai_sluyu_points($uid) . '</h2><p>积分由签到和任务获得，可用于补签、明确标注的独立正文和下载解锁。积分不是现金，不支持提现或兑换承诺；每次扣分前请核对用途和价格。</p><a href="' . esc_url(wuai_sluyu_portal_url('orders')) . '">查看真实支付订单 →</a></section><section class="sluyu-panel"><h2>积分流水</h2><div class="sluyu-table-wrap"><table><thead><tr><th>时间</th><th>说明</th><th>积分变动</th></tr></thead><tbody>';
+    $events=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.wuai_sluyu_table('events').' WHERE user_id=%d AND points<>0 ORDER BY id DESC LIMIT 30 OFFSET %d',$uid,($page-1)*30));
+    foreach($events as $entry) { echo '<tr><td>' . esc_html($entry->created_at) . '</td><td>' . esc_html($entry->payload) . '</td><td>' . ($entry->points>0?'+':'') . (int)$entry->points . '</td></tr>'; }
     echo '</tbody></table></div>'; if(!$events)wuai_sluyu_empty('暂无积分记录。');
-    global $wpdb; $total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . wuai_sluyu_table('events') . ' WHERE user_id=%d',$uid));
+    $total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . wuai_sluyu_table('events') . ' WHERE user_id=%d AND points<>0',$uid));
     wuai_sluyu_portal_pagination(ceil($total/30),'gold'); echo '</section>';
 }
 
@@ -107,7 +107,15 @@ function wuai_sluyu_view_bans() {
 
 function wuai_sluyu_view_submit() {
     if(!wuai_sluyu_require_login())return;
+    if(wuai_sluyu_query('kind')==='listing') { wuai_sluyu_view_listing_submit(); return; }
+    $requested_group=wuai_sluyu_query('group','0');
+    $invalid_group=(isset($_GET['group']) && !is_scalar($_GET['group'])) || (!isset($_GET['group']) && isset($_GET['circle_id']) && !is_scalar($_GET['circle_id']));
+    if ($invalid_group || !preg_match('/^(?:0|[1-9][0-9]{0,9})$/D',$requested_group) || ((int)$requested_group && !wuai_sluyu_circle_can_post((int)$requested_group,get_current_user_id()))) {
+        echo '<section class="sluyu-panel"><h2>暂不能向所选圈子发布</h2><p>请先加入开放的圈子，并满足它的发帖或会员条件。不会自动改成未分组投稿。</p><p><a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('circles')).'">查看圈子 / 申请加入</a> <a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('submit',['kind'=>'topic'])).'">改为未分组投稿</a></p></section>';
+        return;
+    }
     echo '<section class="sluyu-panel"><h2>每一份分享，都值得认真对待</h2><p>发布内容需经管理员审核。请确认拥有分享权限，不发布个人隐私、侵权或违法内容。</p>';
+    echo '<p><a href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>'listing'])) . '">发布供求信息 →</a></p>';
     wuai_sluyu_form_start('submit'); $selected=sanitize_key(wuai_sluyu_query('kind','topic'));
     echo '<label>发布类型<select name="kind">';
     foreach(['topic'=>'日常话题','question'=>'提问','poll'=>'投票','post'=>'文章投稿','news'=>'快讯爆料','link'=>'网址入驻','ticket'=>'工单 / 资源反馈'] as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected($value,$selected,false) . '>' . esc_html($label) . '</option>'; }
@@ -115,7 +123,7 @@ function wuai_sluyu_view_submit() {
     wuai_sluyu_poll_submission_fields();
     echo '<label>茶话会分组（仅显示可发帖圈子）<select name="group"><option value="0">未分组</option>';
     $terms=get_terms(['taxonomy'=>'sluyu_circle','hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term) { if(!wuai_sluyu_circle_can_post($term->term_id,get_current_user_id()))continue; echo '<option value="' . absint($term->term_id) . '" ' . selected(absint(wuai_sluyu_query('group')),$term->term_id,false) . '>' . esc_html($term->name) . '</option>'; }
-    echo '</select></label>'; wuai_sluyu_form_end('提交审核'); echo '</section>';
+    echo '</select></label>'; wuai_sluyu_protected_submission_fields(); wuai_sluyu_form_end('提交审核'); echo '</section>';
 }
 
 function wuai_sluyu_view_channel($key) {
@@ -136,7 +144,9 @@ function wuai_sluyu_view_feed($key) {
     $config=['circle'=>['sluyu_topic','sluyu_circle','topic'],'newsflashes'=>['sluyu_news','sluyu_news_cat','news'],'links'=>['sluyu_link','sluyu_link_cat','link']][$key];
     $group=absint(wuai_sluyu_query('group')); $kind=sanitize_key(wuai_sluyu_query('kind')); $page=wuai_sluyu_page_number();
     if($key==='circle' && $group) { if(!wuai_sluyu_circle($group)) { wuai_sluyu_empty('此圈子不存在或尚未开放。'); return; } wuai_sluyu_circle_header($group); }
-    echo '<section class="sluyu-panel"><div class="sluyu-panel-heading"><h2>' . esc_html(wuai_sluyu_portal_pages()[$key][0]) . '</h2><a class="sluyu-action-primary" href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>$config[2],'group'=>$group])) . '">' . ($key==='links'?'申请入驻':'发布内容') . '</a></div><div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url($key)) . '">全部</a>';
+    echo '<section class="sluyu-panel"><div class="sluyu-panel-heading"><h2>' . esc_html(wuai_sluyu_portal_pages()[$key][0]) . '</h2>';
+    if ($key!=='circle' || !$group || wuai_sluyu_circle_can_post($group,get_current_user_id())) { echo '<a class="sluyu-action-primary" href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>$config[2],'group'=>$group])) . '">' . ($key==='links'?'申请入驻':'发布内容') . '</a>'; }
+    echo '</div><div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url($key)) . '">全部</a>';
     if($key==='circle')echo '<a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">圈子广场 / 创建圈子</a>';
     $terms=get_terms(['taxonomy'=>$config[1],'hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['group'=>$term->term_id])) . '">' . esc_html($term->name) . '</a>';
     if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value,'group'=>$group])) . '">' . $label . '</a>';

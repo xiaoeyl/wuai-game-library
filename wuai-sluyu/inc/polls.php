@@ -39,8 +39,20 @@ function wuai_sluyu_poll_tally($id, $poll = null) {
     return ['counts'=>$counts,'voters'=>$voters];
 }
 
+function wuai_sluyu_poll_participation($id, $uid = null) {
+    $uid = $uid === null ? get_current_user_id() : absint($uid);
+    $post = wuai_sluyu_public_post($id, ['sluyu_topic']); $poll = wuai_sluyu_poll($id);
+    if (!$post || !$poll) { return new WP_Error('poll', '投票不存在或尚未公开。'); }
+    $permission = wuai_sluyu_circle_topic_participation($id, $uid);
+    if (is_wp_error($permission)) { return $permission; }
+    if ($poll['closed']) { return new WP_Error('poll_closed', '本次投票已结束。'); }
+    if (wuai_sluyu_has_event($uid, 'vote:' . $id)) { return new WP_Error('voted', '你已经参与过这次投票。'); }
+    return true;
+}
+
 add_filter('wuai_sluyu_community_dispatch', function ($result,$operation,$uid) {
-    if (!in_array($operation,['vote','poll_close'],true)) { return $result; }
+    if ($result !== null || !in_array($operation,['vote','poll_close'],true)) { return $result; }
+    if (!$uid || (int)$uid !== get_current_user_id() || !get_userdata($uid) || wuai_sluyu_banned($uid)) { return new WP_Error('poll_auth','请使用正常状态的账号登录后操作。'); }
     $id=absint(wuai_sluyu_input('id'));
     $post=wuai_sluyu_public_post($id,['sluyu_topic']); $poll=wuai_sluyu_poll($id);
     if (!$post || !$poll) { return new WP_Error('poll','投票不存在或尚未公开。'); }
@@ -54,13 +66,12 @@ add_filter('wuai_sluyu_community_dispatch', function ($result,$operation,$uid) {
         if ($operation==='poll_close') {
             if ((int)$post->post_author!==$uid && !user_can($uid,'moderate_comments')) { return new WP_Error('permission','只有发起人或管理员可以结束投票。'); }
             update_post_meta($id,'_wuai_poll_closed',1);
+            wp_cache_delete($id, 'post_meta');
+            if ((int)get_post_meta($id,'_wuai_poll_closed',true) !== 1) { return new WP_Error('poll_storage','结束状态未保存，投票仍保持原状态。请稍后重试。'); }
             return ['message'=>'投票已结束，已有结果保留。','reload'=>true];
         }
-        if ($poll['closed']) { return new WP_Error('poll_closed','本次投票已结束。'); }
-        $groups=wp_get_object_terms($id,'sluyu_circle',['fields'=>'ids','wuai_include_pending'=>true]);
-        if (is_wp_error($groups)) { return new WP_Error('group','无法验证圈子权限，请稍后再试。'); }
-        foreach ($groups as $group) { if (!wuai_sluyu_circle_can_post($group,$uid)) { return new WP_Error('circle_vote','请先满足此圈子的参与条件。'); } }
-        if (wuai_sluyu_has_event($uid,'vote:'.$id)) { return new WP_Error('voted','你已经参与过这次投票。'); }
+        $permission = wuai_sluyu_poll_participation($id, $uid);
+        if (is_wp_error($permission)) { return $permission; }
         $raw=isset($_POST['choice'])?wp_unslash($_POST['choice']):'';
         if (is_array($raw)) {
             foreach ($raw as $value) { if (!is_scalar($value)) { return new WP_Error('choice','请选择有效选项。'); } }
@@ -98,7 +109,8 @@ function wuai_sluyu_poll_view($id) {
     $tally=wuai_sluyu_poll_tally($id,$poll); $uid=get_current_user_id(); global $wpdb;
     $payload=$uid?$wpdb->get_var($wpdb->prepare('SELECT payload FROM '.wuai_sluyu_table('events').' WHERE user_id=%d AND event_key=%s',$uid,'vote:'.$id)):null;
     $ballot=$payload!==null?wuai_sluyu_poll_ballot($payload,count($poll['choices'])):[];
-    $can_vote=$uid && !$poll['closed'] && $payload===null && !wuai_sluyu_banned($uid);
+    $participation=wuai_sluyu_poll_participation($id, $uid);
+    $can_vote=$participation===true;
     echo '<section class="sluyu-panel sluyu-poll sluyu-poll-' . esc_attr($poll['mode']) . '"><div class="sluyu-panel-heading"><h2>' . esc_html(['single'=>'单选投票','multiple'=>'多选投票','pk'=>'观点 PK'][$poll['mode']]) . '</h2><span class="sluyu-state-pill">' . ($poll['closed']?'已结束':($payload!==null?'已参与':'进行中')) . '</span></div><p class="sluyu-muted">' . $tally['voters'] . ' 人参与 · 最多选 ' . $poll['max'] . ' 项';
     if ($poll['deadline']) { echo ' · 截止 ' . esc_html(wp_date('Y-m-d H:i',$poll['deadline'])) . '（' . esc_html(wp_timezone_string()) . '）'; }
     echo '</p>';
@@ -112,8 +124,9 @@ function wuai_sluyu_poll_view($id) {
     }
     if ($can_vote) { wuai_sluyu_form_end('提交投票'); } else { echo '</div>'; }
     if (!$uid && !$poll['closed']) { echo '<p><a href="' . esc_url(wp_login_url(get_permalink($id))) . '">登录后投票 →</a></p>'; }
+    elseif ($uid && !$poll['closed'] && $payload===null && is_wp_error($participation)) { echo '<p class="sluyu-muted">' . esc_html($participation->get_error_message()) . '</p><a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">查看圈子与参与条件 →</a>'; }
     if ($poll['mode']==='multiple') { echo '<p class="sluyu-muted">百分比以参与人数计算，多选结果之和可超过 100%。投票后不可重复或改投。</p>'; }
-    if (!$poll['closed'] && $uid && ((int)get_post_field('post_author',$id)===$uid || user_can($uid,'moderate_comments'))) { wuai_sluyu_action_button('poll_close','提前结束投票',['id'=>$id,'confirm'=>'确认结束投票？结果将保留，但不能继续投票。']); }
+    if (!$poll['closed'] && $uid && !wuai_sluyu_banned($uid) && ((int)get_post_field('post_author',$id)===$uid || user_can($uid,'moderate_comments'))) { wuai_sluyu_action_button('poll_close','提前结束投票',['id'=>$id,'confirm'=>'确认结束投票？结果将保留，但不能继续投票。']); }
     echo '</section>';
 }
 

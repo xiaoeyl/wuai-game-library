@@ -20,7 +20,7 @@ foreach (['qa_member_a','qa_member_b','qa_member_c'] as $login) {
     (new WP_User($id))->set_role('subscriber');
     wp_update_user(['ID'=>$id,'description'=>'','display_name'=>$login]);
     foreach(['submit','verify','report','message'] as $operation)delete_transient('wuai_rate_'.$id.'_'.$operation);
-    foreach(['_wuai_banned_until','_wuai_sluyu_checkin_date','_wuai_sluyu_checkin_days','_wuai_checkin_streak','_wuai_verified_title','_wuai_member_until'] as $key)delete_user_meta($id,$key);
+    foreach(['_wuai_banned_until','_wuai_sluyu_checkin_date','_wuai_sluyu_checkin_days','_wuai_checkin_streak','_wuai_verified_title','_wuai_membership_state','_wuai_membership_sync','_wuai_membership_grants','_wuai_member_until'] as $key)delete_user_meta($id,$key);
     $wpdb->delete(wuai_sluyu_table('events'),['user_id'=>$id]);
     $wpdb->query($wpdb->prepare('DELETE FROM '.wuai_sluyu_table('messages').' WHERE sender_id=%d OR recipient_id=%d',$id,$id));
     $existing_posts=get_posts(['post_type'=>['post','sluyu_topic','sluyu_news','sluyu_link','sluyu_verify','sluyu_ticket'],'author'=>$id,'post_status'=>'any','numberposts'=>-1]);

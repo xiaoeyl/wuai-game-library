@@ -54,7 +54,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.WP_LAYOUT_FIXTURE || path
     assert.match(await helpLink.getAttribute('href'), /document|page_id|sluyu_page/);
     await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
     await page.screenshot({ path: path.join(output, 'footer-desktop.png') });
-    assert.equal(await page.locator('a[href*="/wp-admin"]').count(), 0, 'Public page does not expose backend links.');
+    assert.equal(await page.locator('a[href*="/wp-admin"]:not([href*="action=wuai_sluyu_download"])').count(), 0, 'Public page does not expose backend pages; signed download handoff is intentional.');
     const protectedResponse = await context.request.get(base + '/?p=' + fixture.protected);
     const protectedHtml = await protectedResponse.text();
     assert.equal(protectedHtml.includes('protected-secret.zip'), false);

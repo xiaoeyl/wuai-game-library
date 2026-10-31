@@ -116,9 +116,8 @@
     if (window.wuaiSluyu && window.wuaiSluyu.loggedIn) return;
     try {button.setAttribute('aria-pressed',localStorage.getItem('sluyu-bookmark-'+button.dataset.sluyuBookmark)==='1'?'true':'false');} catch (error) { /* Storage may be blocked. */ }
   });
-  var toc = document.querySelector('.sluyu-toc');
-  if (toc) {
-    var headings = document.querySelectorAll('.sluyu-article-reference .sluyu-entry h2,.sluyu-article-reference .sluyu-entry h3,.sluyu-article-reference .sluyu-entry h4');
+  document.querySelectorAll('.sluyu-toc').forEach(function (toc) {
+    var headings = document.querySelectorAll('.sluyu-article .sluyu-entry h2,.sluyu-article .sluyu-entry h3,.sluyu-article .sluyu-entry h4');
     headings.forEach(function (heading,index) {
       if (!heading.textContent.trim()) return;
       if (!heading.id) {
@@ -132,12 +131,14 @@
       link.dataset.level = heading.tagName.slice(1);
       toc.appendChild(link);
     });
-    toc.closest('section').hidden = !toc.children.length;
+    var container = toc.closest('[data-sluyu-toc-container]') || toc.closest('section');
+    container.hidden = !toc.children.length;
+    if (container.nextElementSibling && container.nextElementSibling.classList.contains('sluyu-toc-fallback')) container.nextElementSibling.hidden = !!toc.children.length;
     if ('IntersectionObserver' in window) {
       var observer = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {if(entry.isIntersecting) toc.querySelectorAll('a').forEach(function (a) {a.classList.toggle('is-current', decodeURIComponent(a.hash.slice(1))===entry.target.id);});});
       }, {rootMargin:'-15% 0px -65% 0px'});
       headings.forEach(function (heading) {observer.observe(heading);});
     }
-  }
+  });
 })();

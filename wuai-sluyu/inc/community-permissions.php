@@ -29,6 +29,7 @@ add_filter('map_meta_cap', function ($caps, $cap, $uid, $args) {
         'edit_pages','edit_others_pages','edit_published_pages','edit_private_pages','publish_pages',
         'delete_pages','delete_others_pages','delete_published_pages','delete_private_pages','upload_files',
         'wuai_manage_service_content',
+        'manage_categories','edit_terms','delete_terms','assign_terms','edit_term','delete_term','assign_term',
     ];
     if ($uid && in_array($cap, $write_caps, true) && wuai_sluyu_banned($uid)) { return ['do_not_allow']; }
     if ($cap === 'wuai_manage_service_content') { return ['edit_others_posts']; }

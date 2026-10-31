@@ -7,7 +7,7 @@ require $root.'/wp-load.php';
 if(home_url()!=='http://127.0.0.1:8771' || !class_exists('WooCommerce'))throw new RuntimeException('Disposable local WooCommerce required.');
 function check_commerce($condition,$message) { if(!$condition)throw new RuntimeException($message); }
 $user=get_user_by('login','qa_member_c'); $uid=$user->ID;
-delete_user_meta($uid,'_wuai_membership_grants'); delete_user_meta($uid,'_wuai_member_until');
+foreach (['_wuai_membership_state','_wuai_membership_sync','_wuai_membership_grants','_wuai_member_until'] as $key) { delete_user_meta($uid,$key); }
 $product=new WC_Product_Simple(); $product->set_name('QA membership'); $product->set_status('publish'); $product->set_virtual(true); $product->set_regular_price('10'); $product->update_meta_data('_wuai_membership_days',30); $product->save();
 wp_set_current_user(0);
 check_commerce(!apply_filters('woocommerce_add_to_cart_validation',true,$product->get_id()),'Guests cannot buy memberships.');

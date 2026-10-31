@@ -27,10 +27,9 @@ function wuai_sluyu_view_commerce($key) {
         }
     } elseif ($key === 'coupons') {
         echo '<h2>可领取的优惠券</h2><p>复制优惠码，在购物车或结算页使用。实际优惠、适用商品和使用资格由结算时校验。</p>';
-        $codes=array_slice(array_filter(array_map('trim',explode("\n",wuai_sluyu_option('public_coupon_codes','')))),0,30); $count=0;
-        foreach($codes as $code) {
-            $coupon=new WC_Coupon($code); if(!$coupon->get_id() || ($coupon->get_date_expires() && $coupon->get_date_expires()->getTimestamp()<time()))continue;
-            if($coupon->get_usage_limit() && $coupon->get_usage_count()>=$coupon->get_usage_limit())continue;
+        $count=0;
+        foreach(wuai_sluyu_public_coupons() as $coupon) {
+            $code=$coupon->get_code();
             $count++;
             echo '<article class="sluyu-coupon"><h3>' . esc_html($coupon->get_discount_type()==='percent'?$coupon->get_amount().'%':wp_strip_all_tags(wc_price($coupon->get_amount()))) . ' 优惠</h3><code>' . esc_html($code) . '</code><p>' . esc_html($coupon->get_description()) . '</p><button class="sluyu-action-plain" type="button" data-sluyu-copy="' . esc_attr($code) . '">复制优惠码</button></article>';
         }
@@ -75,23 +74,7 @@ add_action('woocommerce_check_cart_items', function () {
 });
 
 function wuai_sluyu_membership_order_changed($order_id) {
-    $order=wc_get_order($order_id); if(!$order || !$order->get_user_id())return;
-    $uid=$order->get_user_id(); $lock=wuai_sluyu_lock('member_' . $uid);
-    if(!$lock) { if(!wp_next_scheduled('wuai_sluyu_retry_membership',[$order_id]))wp_schedule_single_event(time()+10,'wuai_sluyu_retry_membership',[$order_id]); return; }
-    try {
-    $grants=get_user_meta($uid,'_wuai_membership_grants',true);
-    $grants=is_array($grants)?array_filter($grants,function($grant){return is_array($grant) && isset($grant['at'],$grant['days']);}):[];
-    $days=0; $lifetime=false;
-    if($order->is_paid() && $order->get_total_refunded()<=0) {
-        foreach($order->get_items() as $item) { $duration=(int)$item->get_meta('_wuai_membership_days'); if($duration===-1)$lifetime=true; elseif($duration>0)$days+=$duration*max(1,$item->get_quantity()); }
-    }
-    if($days || $lifetime) { $paid=$order->get_date_paid(); $grants[$order_id]=['at'=>$paid?$paid->getTimestamp():time(),'days'=>$lifetime?-1:$days]; }
-    else { unset($grants[$order_id]); }
-    uasort($grants,function($a,$b){return $a['at']<=>$b['at'];}); $until=0;
-    foreach($grants as $grant) { if($grant['days']===-1){$until=-1;break;} $until=max($until,$grant['at'])+$grant['days']*DAY_IN_SECONDS; }
-    update_user_meta($uid,'_wuai_membership_grants',$grants);
-    update_user_meta($uid,'_wuai_member_until',$until);
-    } finally { wuai_sluyu_unlock($lock); }
+    return wuai_sluyu_membership_sync($order_id);
 }
 add_action('woocommerce_order_status_changed','wuai_sluyu_membership_order_changed');
 add_action('woocommerce_payment_complete','wuai_sluyu_membership_order_changed');
@@ -99,9 +82,5 @@ add_action('woocommerce_order_refunded','wuai_sluyu_membership_order_changed');
 add_action('wuai_sluyu_retry_membership','wuai_sluyu_membership_order_changed');
 
 function wuai_sluyu_resource_access($post_id) {
-    if(post_password_required($post_id))return false;
-    $mode=wuai_sluyu_post_meta($post_id,'download_access','public');
-    if($mode==='login')return is_user_logged_in() && !wuai_sluyu_banned(get_current_user_id());
-    if($mode==='member')return is_user_logged_in() && !wuai_sluyu_banned(get_current_user_id()) && wuai_sluyu_member();
-    return true;
+    return wuai_sluyu_download_access($post_id);
 }

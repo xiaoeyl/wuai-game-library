@@ -24,10 +24,14 @@ add_filter('wp_privacy_personal_data_erasers', function ($erasers) {
 function wuai_sluyu_erase_personal_data($email,$page=1) {
     $user=get_user_by('email',$email); if(!$user)return ['items_removed'=>false,'items_retained'=>false,'messages'=>[],'done'=>true];
     global $wpdb;
+    $lock=wuai_sluyu_lock('user_'.$user->ID);
+    if(!$lock)return ['items_removed'=>false,'items_retained'=>true,'messages'=>['账号正在执行其他操作，请稍后重新执行社区数据清除。'],'done'=>true];
+    try {
     $removed=$wpdb->query($wpdb->prepare('DELETE FROM '.wuai_sluyu_table('messages').' WHERE sender_id=%d OR recipient_id=%d',$user->ID,$user->ID));
     $removed+=$wpdb->query($wpdb->prepare('DELETE FROM '.wuai_sluyu_table('events')." WHERE (user_id=%d AND event_type IN ('bookmark','follow','vote','news_vote')) OR (target_id=%d AND event_type='follow')",$user->ID,$user->ID));
     $removed+=$wpdb->delete(wuai_sluyu_table('memberships'),['user_id'=>$user->ID]);
     foreach(['_wuai_message_receive','_wuai_message_blocks'] as $meta_key) { if(delete_user_meta($user->ID,$meta_key))$removed++; }
     $retained=(bool)$wpdb->get_var($wpdb->prepare('SELECT id FROM '.wuai_sluyu_table('events').' WHERE user_id=%d LIMIT 1',$user->ID));
-    return ['items_removed'=>(bool)$removed,'items_retained'=>$retained,'messages'=>$retained?['积分与任务领取凭证暂保留以防重复领取；删除账号时一并删除。支付订单请使用 WooCommerce 的数据处理流程。']:[],'done'=>true];
+    return ['items_removed'=>(bool)$removed,'items_retained'=>$retained,'messages'=>$retained?['积分、任务领取与积分解锁凭证暂保留，以防重复领取 / 扣款并保留已购权益；删除账号时一并删除。支付订单请使用 WooCommerce 的数据处理流程。']:[],'done'=>true];
+    } finally { wuai_sluyu_unlock($lock); }
 }

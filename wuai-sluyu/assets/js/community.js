@@ -80,7 +80,11 @@
     });
   });
   document.querySelectorAll('.sluyu-community-form select[name=kind]').forEach(function (select) {
-    function update() { var field = select.form.querySelector('[data-poll-field]'); if (field) { field.hidden = select.value !== 'poll'; field.disabled = select.value !== 'poll'; } }
+    function update() {
+      var field = select.form.querySelector('[data-poll-field]'); if (field) { field.hidden = select.value !== 'poll'; field.disabled = select.value !== 'poll'; }
+      var protectedFields = select.form.querySelector('.sluyu-protected-fields');
+      if (protectedFields) { var enabled = ['post','topic'].includes(select.value); protectedFields.hidden = !enabled; protectedFields.querySelectorAll('input,textarea,select').forEach(function (input) { input.disabled = !enabled; }); }
+    }
     select.addEventListener('change', update); update();
   });
   document.querySelectorAll('select[name=poll_mode]').forEach(function (select) {

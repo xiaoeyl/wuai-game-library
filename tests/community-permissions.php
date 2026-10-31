@@ -100,6 +100,8 @@ try {
     perm_check(get_the_title($ordinary_id) === 'QA ordinary author changed', 'Banned update never damages original data.');
     update_user_meta($editor, '_wuai_banned_until', -1); wp_set_current_user($editor);
     perm_check(!current_user_can('wuai_manage_service_content'), 'Ban overrides trusted-editor capability.');
+    perm_check(!current_user_can('manage_categories') && !current_user_can('edit_term',$circle) && !current_user_can('delete_term',$circle), 'Banned editor cannot bypass circle restrictions through native taxonomy management.');
+    perm_check(perm_rest($editor, 'POST', '/wp/v2/sluyu_circle', ['name'=>'Banned editor circle'])->get_status() === 403, 'Banned editor cannot create native REST circles.');
     perm_check(perm_rest($editor, 'POST', '/wp/v2/sluyu_news', ['title'=>'Blocked editor','content'=>'Must not publish.'])->get_status() === 403, 'Banned editor cannot publish service content.');
     echo "PASS: native service CPT capabilities, REST create/edit/delete isolation, retained ordinary author rights, moderated frontend submission, cross-entry comment membership/ban gates and core update rejection.\n";
 } finally {

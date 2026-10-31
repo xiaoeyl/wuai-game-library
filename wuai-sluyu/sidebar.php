@@ -1,4 +1,4 @@
-<?php $options = wuai_sluyu_get_options(); $article_id = is_singular('post') ? get_queried_object_id() : 0; ?>
+<?php $options = wuai_sluyu_get_options(); $article_id = is_singular(['post','page','sluyu_topic']) && !wuai_sluyu_portal_key() ? get_queried_object_id() : 0; ?>
 <aside class="sluyu-sidebar sluyu-sidebar-reference">
 <?php if (is_active_sidebar('sluyu-sidebar')) : dynamic_sidebar('sluyu-sidebar'); else : ?>
 <?php if ($article_id) : $author_id = (int) get_post_field('post_author', $article_id); $author = get_userdata($author_id); ?>

@@ -9,6 +9,8 @@ function wuai_sluyu_portal_pages() {
         'gold' => ['财富管理', '积分明细与账户记录', 'coin-line'],
         'circle' => ['茶话会', '分享日常，交流问题，一起投票', 'chat-smile-2-line'],
         'circles' => ['圈子广场', '寻找同好，加入或创建你的茶话会', 'chat-heart-line'],
+        'listings' => ['供求广场', '审核制供求信息与站内联系', 'megaphone-line'],
+        'invitations' => ['我的邀请码', '一次性邀请，共同维护友善社区', 'mail-send-line'],
         'newsflashes' => ['解忧资讯', '发现新鲜事，分享值得关注的消息', 'notification-3-line'],
         'links' => ['网址导航', '收藏好网站，也欢迎推荐你的站点', 'links-line'],
         'document' => ['帮助中心', '下载、解压、账户与订单使用指南', 'book-open-line'],
@@ -42,7 +44,7 @@ function wuai_sluyu_channels() {
 }
 
 function wuai_sluyu_portal_aliases() {
-    return ['today'=>'mission','mission/today'=>'mission','vip'=>'vips','user'=>'account','forums'=>'circle','all-circles'=>'circles','create-circle'=>'circles','circle-users'=>'circle','write'=>'submit','po-ask'=>'submit','link-register'=>'submit','about'=>'gyuwo','help'=>'document','terms'=>'yhusm','disclaimer'=>'mianzesm','cart'=>'carts','coupon'=>'coupons','messages'=>'directmessage','psuaujs'=>'tuimg','cat-group/psuaujs'=>'tuimg','biaotibg4'=>'xiezhenji','cat-group/biaotibg4'=>'xiezhenji','xiezhenji1'=>'xiezhenji'];
+    return ['today'=>'mission','mission/today'=>'mission','vip'=>'vips','user'=>'account','forums'=>'circle','all-circles'=>'circles','create-circle'=>'circles','circle-users'=>'circle','write'=>'submit','po-ask'=>'submit','link-register'=>'submit','po-infomation'=>'submit','about'=>'gyuwo','help'=>'document','terms'=>'yhusm','disclaimer'=>'mianzesm','cart'=>'carts','coupon'=>'coupons','messages'=>'directmessage','psuaujs'=>'tuimg','cat-group/psuaujs'=>'tuimg','biaotibg4'=>'xiezhenji','cat-group/biaotibg4'=>'xiezhenji','xiezhenji1'=>'xiezhenji'];
 }
 
 function wuai_sluyu_portal_routes() {
@@ -106,7 +108,7 @@ add_filter('request', function ($vars) {
 });
 add_action('template_redirect', function () {
     if (is_user_logged_in()) { nocache_headers(); }
-    if (is_singular('post') && wuai_sluyu_post_meta(get_queried_object_id(),'download_access','public') !== 'public') { nocache_headers(); }
+    if (is_singular() && wuai_sluyu_post_meta(get_queried_object_id(),'download_url','')) { nocache_headers(); }
     if (!wuai_sluyu_portal_key()) { return; }
     if (get_query_var('sluyu_page')) { global $wp_query; $wp_query->is_404 = false; $wp_query->is_home = false; status_header(200); }
     if (is_user_logged_in() || in_array(wuai_sluyu_portal_key(), ['account','gold','directmessage','message','orders','carts','task','verify'], true)) { nocache_headers(); }
@@ -143,7 +145,8 @@ add_action('admin_init', function () {
     }
 });
 add_action('admin_post_wuai_sluyu_install_pages', function () {
-    if (!current_user_can('manage_options')) { wp_die('无权操作', '', ['response'=>403]); }
+    if (($_SERVER['REQUEST_METHOD']??'')!=='POST') { wp_die('请使用表单提交', '', ['response'=>405]); }
+    if (!current_user_can('manage_options') || wuai_sluyu_banned(get_current_user_id())) { wp_die('无权操作', '', ['response'=>403]); }
     check_admin_referer('wuai_sluyu_install_pages');
     foreach (wuai_sluyu_portal_pages() as $slug => $page) {
         if (get_page_by_path($slug)) { continue; }

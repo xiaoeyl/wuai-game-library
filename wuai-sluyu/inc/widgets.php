@@ -3,10 +3,10 @@ if (!defined('ABSPATH')) { exit; }
 
 class Wuai_Sluyu_Widget extends WP_Widget {
     public function __construct() {
-        parent::__construct('wuai_sluyu_service', '森鹿语 · 功能小工具', ['description'=>'签到、任务、文章排行、作者、快讯、导航、会员、统计、广告和社群二维码。']);
+        parent::__construct('wuai_sluyu_service', '森鹿语 · 功能小工具', ['description'=>'签到、任务、文章、圈子、个人资料、目录、下载、商品、优惠券、站点介绍和社群二维码。']);
     }
     public static function modes() {
-        return ['checkin'=>'每日签到','tasks'=>'任务进度','posts'=>'最新文章','popular'=>'热门排行','author'=>'作者信息','news'=>'最新快讯','links'=>'网址导航','circles'=>'茶话会圈子','vip'=>'会员中心','stats'=>'站点统计','ad'=>'图片广告','qr'=>'社群二维码'];
+        return ['checkin'=>'每日签到','tasks'=>'任务进度','posts'=>'最新文章','popular'=>'热门排行','author'=>'作者信息','news'=>'最新快讯','links'=>'网址导航','circles'=>'茶话会圈子','vip'=>'会员中心','stats'=>'站点统计','ad'=>'图片广告','qr'=>'社群二维码','about'=>'关于本站','user'=>'登录与个人信息','toc'=>'文章目录','download'=>'当前文章下载','products'=>'商城商品','coupons'=>'公开优惠券','listings'=>'最新供求'];
     }
     public function form($instance) {
         $mode=$instance['mode']??'checkin';
@@ -17,13 +17,17 @@ class Wuai_Sluyu_Widget extends WP_Widget {
         foreach(self::modes() as $key=>$label)echo '<option value="' . esc_attr($key) . '" ' . selected($mode,$key,false) . '>' . esc_html($label) . '</option>'; echo '</select></label></p>';
     }
     public function update($new,$old) {
+        $new=is_array($new)?$new:[];
+        foreach(['mode','title','count','image','url'] as $key) { if(isset($new[$key]) && !is_scalar($new[$key]))$new[$key]=''; }
         return ['mode'=>isset(self::modes()[$new['mode']??''])?$new['mode']:'checkin','title'=>sanitize_text_field($new['title']??''),'count'=>max(1,min(10,absint($new['count']??5))),'image'=>esc_url_raw($new['image']??'',['http','https']),'url'=>esc_url_raw($new['url']??'',['http','https'])];
     }
     public function widget($args,$instance) {
         $mode=$instance['mode']??'checkin'; $title=$instance['title']??''; $count=max(1,min(10,absint($instance['count']??5)));
         if(!isset(self::modes()[$mode]))return;
         echo $args['before_widget']; echo $args['before_title'] . esc_html($title?:self::modes()[$mode]) . $args['after_title'];
-        if(in_array($mode,['posts','popular','news','links'],true)) {
+        if(wuai_sluyu_extended_widget($mode,$count,$instance,$args)) {
+            // Extended widgets use the same authorization as their full pages.
+        } elseif(in_array($mode,['posts','popular','news','links'],true)) {
             $query=new WP_Query(['post_type'=>['news'=>'sluyu_news','links'=>'sluyu_link'][$mode]??'post','post_status'=>'publish','has_password'=>false,'posts_per_page'=>$count,'no_found_rows'=>true,'ignore_sticky_posts'=>true,'orderby'=>$mode==='popular'?'comment_count':'date']);
             echo '<div class="sluyu-widget-list">'; $rank=0;
             while($query->have_posts()) { $query->the_post(); $rank++; echo '<a href="' . esc_url(get_permalink()) . '"><b>' . $rank . '</b><span>' . esc_html(get_the_title()) . '<small>' . esc_html(get_the_date('m-d')) . '</small></span></a>'; }

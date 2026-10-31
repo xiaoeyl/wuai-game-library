@@ -21,13 +21,14 @@ function wuai_sluyu_unlock($lock) {
 }
 
 function wuai_sluyu_install_storage() {
-    if (get_option('wuai_sluyu_storage_version') === '3') { return; }
+    if (get_option('wuai_sluyu_storage_version') === '4') { return; }
     global $wpdb;
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $charset = $wpdb->get_charset_collate();
     $events = wuai_sluyu_table('events');
     $messages = wuai_sluyu_table('messages');
     $memberships = wuai_sluyu_table('memberships');
+    $invites = wuai_sluyu_table('invites');
     dbDelta("CREATE TABLE $events (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
         user_id bigint(20) unsigned NOT NULL,
@@ -68,9 +69,27 @@ function wuai_sluyu_install_storage() {
         KEY user_status (user_id,status),
         KEY circle_status (circle_id,status)
     ) $charset;");
+    dbDelta("CREATE TABLE $invites (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        code_hash char(64) NOT NULL,
+        code_hint varchar(8) NOT NULL,
+        owner_id bigint(20) unsigned NOT NULL,
+        claimed_by bigint(20) unsigned NOT NULL DEFAULT 0,
+        status varchar(20) NOT NULL DEFAULT 'active',
+        expires_at bigint(20) unsigned NOT NULL,
+        created_at datetime NOT NULL,
+        claimed_at datetime DEFAULT NULL,
+        reserve_token char(64) NOT NULL DEFAULT '',
+        reserve_fingerprint char(64) NOT NULL DEFAULT '',
+        reserved_at bigint(20) unsigned NOT NULL DEFAULT 0,
+        PRIMARY KEY  (id),
+        UNIQUE KEY code_hash (code_hash),
+        KEY owner_created (owner_id,created_at),
+        KEY status_expiry (status,expires_at)
+    ) $charset;");
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $events)) === $events && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $messages)) === $messages && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $memberships)) === $memberships) {
         $columns=$wpdb->get_col("SHOW COLUMNS FROM $messages");
-        if (in_array('sender_deleted',$columns,true) && in_array('recipient_deleted',$columns,true)) { update_option('wuai_sluyu_storage_version', '3', false); }
+        if (in_array('sender_deleted',$columns,true) && in_array('recipient_deleted',$columns,true) && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$invites))===$invites && !array_diff(['id','code_hash','code_hint','owner_id','claimed_by','status','expires_at','created_at','claimed_at','reserve_token','reserve_fingerprint','reserved_at'],$wpdb->get_col("SHOW COLUMNS FROM $invites"))) { update_option('wuai_sluyu_storage_version', '4', false); }
     }
 }
 add_action('after_setup_theme', 'wuai_sluyu_install_storage', 30);
@@ -101,16 +120,23 @@ function wuai_sluyu_banned($user_id) {
 }
 function wuai_sluyu_member($user_id = 0) {
     $user_id = $user_id ?: get_current_user_id();
-    $until = (int) get_user_meta($user_id, '_wuai_member_until', true);
+    $until = wuai_sluyu_membership_until($user_id);
     return $until === -1 || $until > time();
 }
-function wuai_sluyu_public_post($id, $types = ['post','sluyu_topic','sluyu_news','sluyu_link']) {
+function wuai_sluyu_public_post($id, $types = ['post','sluyu_topic','sluyu_news','sluyu_link','sluyu_listing']) {
     $post = get_post($id);
     return $post && in_array($post->post_type, $types, true) && $post->post_status === 'publish' && !post_password_required($post) ? $post : false;
 }
 function wuai_sluyu_input($key, $textarea = false) {
     $value = isset($_POST[$key]) && is_scalar($_POST[$key]) ? wp_unslash((string) $_POST[$key]) : '';
     return $textarea ? sanitize_textarea_field($value) : sanitize_text_field($value);
+}
+function wuai_sluyu_saved_meta_matches($post_id,$expected) {
+    foreach($expected as $key=>$value) {
+        $stored=get_post_meta($post_id,$key,true);
+        if(is_array($value) ? $stored!==$value : (string)$stored!==(string)$value) { return false; }
+    }
+    return true;
 }
 function wuai_sluyu_checkin($user_id) {
     $today = wp_date('Y-m-d');
@@ -185,6 +211,13 @@ function wuai_sluyu_community_operation($operation, $user_id) {
         $kind = $operation === 'submit' ? wuai_sluyu_input('kind') : $operation;
         $types = ['post'=>'post','topic'=>'sluyu_topic','question'=>'sluyu_topic','poll'=>'sluyu_topic','news'=>'sluyu_news','link'=>'sluyu_link','verify'=>'sluyu_verify','ticket'=>'sluyu_ticket','report'=>'sluyu_ticket'];
         if (!isset($types[$kind])) { return new WP_Error('type','无效的发布类型。'); }
+        $group = 0;
+        if ($types[$kind] === 'sluyu_topic' && isset($_POST['group'])) {
+            $raw_group = is_scalar($_POST['group']) ? wp_unslash((string) $_POST['group']) : '';
+            if (!preg_match('/^(?:0|[1-9][0-9]{0,9})$/D', $raw_group)) { return new WP_Error('circle_input','圈子参数无效，请重新选择发布位置。'); }
+            $group = (int) $raw_group;
+            if ($group && !wuai_sluyu_circle_can_post($group,$user_id)) { return new WP_Error('circle_post','所选圈子不可发布，请先加入并满足该圈子的发帖条件。'); }
+        }
         if ($kind === 'verify') {
             $existing = get_posts(['post_type'=>'sluyu_verify','author'=>$user_id,'post_status'=>['pending','publish'],'numberposts'=>1]);
             if ($existing) { return new WP_Error('exists','你已提交认证申请，请等待审核或查看结果。'); }
@@ -204,10 +237,25 @@ function wuai_sluyu_community_operation($operation, $user_id) {
         $submission = ['post_type'=>$types[$kind],'post_status'=>'pending','post_author'=>$user_id,'post_title'=>$title,'post_content'=>$body,'comment_status'=>in_array($kind,['topic','question','poll','post','news'],true)?'open':'closed','meta_input'=>$meta];
         $submission = apply_filters('wuai_sluyu_submission', $submission, $kind, $user_id);
         if (is_wp_error($submission)) { return $submission; }
+        // Keep incomplete metadata or failed taxonomy assignments out of review queues.
+        $submission['post_status'] = 'draft';
         $post_id = wp_insert_post(wp_slash($submission), true);
         if (is_wp_error($post_id)) { return $post_id; }
-        $group = absint(wuai_sluyu_input('group'));
-        if ($types[$kind] === 'sluyu_topic' && $group && term_exists($group, 'sluyu_circle')) { wp_set_object_terms($post_id, [$group], 'sluyu_circle'); }
+        if (!wuai_sluyu_saved_meta_matches($post_id,$submission['meta_input'])) {
+            wp_update_post(['ID'=>$post_id,'post_status'=>'draft']);
+            return new WP_Error('submission_partial','稿件 #'.$post_id.' 的附加信息未完整保存，暂留草稿。请保留表单内容并联系管理员核对，不会公开发布。');
+        }
+        if ($group) {
+            $assigned = wp_set_object_terms($post_id, [$group], 'sluyu_circle');
+            $saved_groups = wp_get_object_terms($post_id, 'sluyu_circle', ['fields'=>'ids','wuai_include_pending'=>true]);
+            if (is_wp_error($assigned) || is_wp_error($saved_groups) || array_map('intval',$saved_groups) !== [$group] || !wuai_sluyu_circle_can_post($group,$user_id)) {
+                return new WP_Error('submission_group','稿件 #'.$post_id.' 未能确认保存到所选圈子，暂留草稿。请保留表单内容并联系管理员，不会改成未分组投稿。');
+            }
+        }
+        $queued = wp_update_post(['ID'=>$post_id,'post_status'=>'pending'], true);
+        if (is_wp_error($queued) || get_post_status($post_id) !== 'pending') {
+            return new WP_Error('submission_queue','稿件 #'.$post_id.' 未进入审核队列，请保留表单内容并联系管理员核对。');
+        }
         do_action('wuai_sluyu_after_submission', $post_id, $kind, $user_id);
         wuai_sluyu_notify($user_id, '你的「' . $title . '」已提交，等待管理员审核。');
         return ['message'=>'已提交审核，通过后才会公开。','reset'=>true];
@@ -271,4 +319,15 @@ add_action('deleted_user', function ($user_id) {
     $wpdb->delete(wuai_sluyu_table('events'), ['event_type'=>'follow','target_id'=>$user_id]);
     $wpdb->delete(wuai_sluyu_table('memberships'), ['user_id'=>$user_id]);
     $wpdb->query($wpdb->prepare('DELETE FROM ' . wuai_sluyu_table('messages') . ' WHERE sender_id=%d OR recipient_id=%d', $user_id, $user_id));
+});
+add_action('delete_user',function($uid){
+    $lock=wuai_sluyu_lock('user_'.$uid);
+    if(!$lock)wp_die('此账号仍有操作正在处理，请稍后重试删除。','',['response'=>409]);
+    $GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]=$lock;
+},1);
+add_action('deleted_user',function($uid){
+    if(isset($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid])) { wuai_sluyu_unlock($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]); unset($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]); }
+},100);
+add_action('shutdown',function(){
+    foreach($GLOBALS['wuai_sluyu_user_deletion_locks']??[] as $lock)wuai_sluyu_unlock($lock);
 });

@@ -8,7 +8,7 @@ $portal_info = isset($portal_pages[$portal_key]) ? $portal_pages[$portal_key] : 
 <main class="sluyu-container sluyu-main sluyu-portal">
     <header class="sluyu-portal-hero"><div><p class="sluyu-eyebrow">EXPLORE / <?php echo esc_html(strtoupper($portal_key)); ?></p><h1><?php echo esc_html($portal_info[0]); ?></h1><p><?php echo esc_html($portal_info[1]); ?></p></div><a class="sluyu-action-plain" href="<?php echo esc_url(wuai_sluyu_portal_url('more')); ?>">全部服务 <?php echo wuai_sluyu_icon('arrow-right-s-line'); ?></a></header>
     <div class="sluyu-portal-layout"><nav class="sluyu-portal-nav" aria-label="站内服务">
-        <?php foreach (['account','mission','task','gold','circle','circles','newsflashes','links','document','directmessage','message','verify','vips','shop','orders','tools','submit'] as $nav_key) : ?><a href="<?php echo esc_url(wuai_sluyu_portal_url($nav_key)); ?>" <?php if ($nav_key === $portal_key) echo 'aria-current="page"'; ?>><?php echo wuai_sluyu_icon($portal_pages[$nav_key][2]); ?><span><?php echo esc_html($portal_pages[$nav_key][0]); ?></span></a><?php endforeach; ?>
+        <?php foreach (['account','mission','task','gold','circle','circles','listings','newsflashes','links','document','directmessage','message','invitations','verify','vips','shop','orders','tools','submit'] as $nav_key) : ?><a href="<?php echo esc_url(wuai_sluyu_portal_url($nav_key)); ?>" <?php if ($nav_key === $portal_key) echo 'aria-current="page"'; ?>><?php echo wuai_sluyu_icon($portal_pages[$nav_key][2]); ?><span><?php echo esc_html($portal_pages[$nav_key][0]); ?></span></a><?php endforeach; ?>
     </nav><div class="sluyu-portal-content">
         <?php $native_commerce = false;
         if (is_page() && !post_password_required()) {

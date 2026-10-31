@@ -26,4 +26,4 @@ $original_structure=get_option('permalink_structure'); $wp_rewrite->set_permalin
 $rules=$wp_rewrite->rewrite_rules();
 foreach(['mission/today','pcgame/dzmxss','document.html','today.html'] as $path){$matched='';foreach($rules as $regex=>$query){if(preg_match('#^'.$regex.'#',$path)){$matched=$query;break;}}state_check(strpos($matched,'sluyu_page=')!==false,'Reference route precedence: '.$path);}
 $wp_rewrite->set_permalink_structure($original_structure); flush_rewrite_rules(false);
-echo "PASS: makeup accounting, streak continuity, verification approval/revocation, bans, privacy export/erasure, 11 widgets and reference rewrite precedence.\n";
+echo 'PASS: makeup accounting, streak continuity, verification approval/revocation, bans, privacy export/erasure, '.count(Wuai_Sluyu_Widget::modes())." widgets and reference rewrite precedence.\n";

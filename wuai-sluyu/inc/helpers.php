@@ -26,7 +26,7 @@ function wuai_sluyu_query($key, $default = '') {
         if ($key==='group' && isset($_GET['circle_id']) && is_scalar($_GET['circle_id'])) { return sanitize_text_field(wp_unslash((string)$_GET['circle_id'])); }
         if ($key==='kind') {
             $route=get_query_var('sluyu_page');
-            if (is_string($route) && isset(['write'=>'post','po-ask'=>'question','link-register'=>'link'][$route])) { return ['write'=>'post','po-ask'=>'question','link-register'=>'link'][$route]; }
+            if (is_string($route) && isset(['write'=>'post','po-ask'=>'question','link-register'=>'link','po-infomation'=>'listing'][$route])) { return ['write'=>'post','po-ask'=>'question','link-register'=>'link','po-infomation'=>'listing'][$route]; }
         }
     }
     return isset($_GET[$key]) && is_scalar($_GET[$key]) ? sanitize_text_field(wp_unslash((string) $_GET[$key])) : $default;
