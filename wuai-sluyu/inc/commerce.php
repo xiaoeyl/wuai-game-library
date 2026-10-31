@@ -19,7 +19,7 @@ function wuai_sluyu_view_commerce($key) {
     elseif ($key === 'carts') { echo do_shortcode('[woocommerce_cart]'); }
     elseif ($key === 'orders') {
         if (wuai_sluyu_require_login()) {
-            $orders=wc_get_orders(['customer_id'=>get_current_user_id(),'limit'=>20,'page'=>max(1,absint($_GET['pg']??1)),'paginate'=>true]);
+            $orders=wc_get_orders(['customer_id'=>get_current_user_id(),'limit'=>20,'page'=>wuai_sluyu_page_number(),'paginate'=>true]);
             echo '<h2>我的订单</h2><div class="sluyu-compact-list">';
             foreach($orders->orders as $order) { echo '<div><a href="' . esc_url($order->get_view_order_url()) . '">#' . esc_html($order->get_order_number()) . '</a><span>' . wp_kses_post($order->get_formatted_order_total()) . '</span><small>' . esc_html(wc_get_order_status_name($order->get_status())) . '</small></div>'; }
             if(!$orders->orders)wuai_sluyu_empty('暂无订单。'); echo '</div>'; wuai_sluyu_portal_pagination($orders->max_num_pages,'orders');

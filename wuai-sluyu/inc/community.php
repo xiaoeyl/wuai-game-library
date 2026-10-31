@@ -21,12 +21,13 @@ function wuai_sluyu_unlock($lock) {
 }
 
 function wuai_sluyu_install_storage() {
-    if (get_option('wuai_sluyu_storage_version') === '1') { return; }
+    if (get_option('wuai_sluyu_storage_version') === '3') { return; }
     global $wpdb;
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $charset = $wpdb->get_charset_collate();
     $events = wuai_sluyu_table('events');
     $messages = wuai_sluyu_table('messages');
+    $memberships = wuai_sluyu_table('memberships');
     dbDelta("CREATE TABLE $events (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
         user_id bigint(20) unsigned NOT NULL,
@@ -48,13 +49,28 @@ function wuai_sluyu_install_storage() {
         kind varchar(20) NOT NULL DEFAULT 'message',
         body text NOT NULL,
         is_read tinyint(1) NOT NULL DEFAULT 0,
+        sender_deleted tinyint(1) NOT NULL DEFAULT 0,
+        recipient_deleted tinyint(1) NOT NULL DEFAULT 0,
         created_at datetime NOT NULL,
         PRIMARY KEY  (id),
         KEY inbox (recipient_id,kind,is_read),
         KEY sender (sender_id,recipient_id)
     ) $charset;");
-    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $events)) === $events && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $messages)) === $messages) {
-        update_option('wuai_sluyu_storage_version', '1', false);
+    dbDelta("CREATE TABLE $memberships (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        circle_id bigint(20) unsigned NOT NULL,
+        user_id bigint(20) unsigned NOT NULL,
+        status varchar(20) NOT NULL DEFAULT 'pending',
+        created_at datetime NOT NULL,
+        updated_at datetime NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY circle_user (circle_id,user_id),
+        KEY user_status (user_id,status),
+        KEY circle_status (circle_id,status)
+    ) $charset;");
+    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $events)) === $events && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $messages)) === $messages && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $memberships)) === $memberships) {
+        $columns=$wpdb->get_col("SHOW COLUMNS FROM $messages");
+        if (in_array('sender_deleted',$columns,true) && in_array('recipient_deleted',$columns,true)) { update_option('wuai_sluyu_storage_version', '3', false); }
     }
 }
 add_action('after_setup_theme', 'wuai_sluyu_install_storage', 30);
@@ -125,10 +141,12 @@ function wuai_sluyu_community_operation($operation, $user_id) {
     global $wpdb;
     $events = wuai_sluyu_table('events');
     $id = absint(wuai_sluyu_input('id'));
+    $extension = apply_filters('wuai_sluyu_community_dispatch', null, $operation, $user_id);
+    if ($extension !== null) { return $extension; }
     if ($operation === 'checkin') { return wuai_sluyu_checkin($user_id); }
     if ($operation === 'makeup') {
         $previous = get_user_meta($user_id, '_wuai_sluyu_checkin_date', true);
-        $start = $previous ? date_create_immutable($previous, wp_timezone()) : false;
+        $start = wuai_sluyu_parse_date($previous);
         $gap = $start ? (int) $start->diff(current_datetime()->setTime(0, 0))->format('%r%a') - 1 : 0;
         $cost = max(1, (int) wuai_sluyu_option('makeup_points', 30)) * $gap;
         if ($gap < 1 || $gap > 7) { return new WP_Error('gap','仅支持补签最近 1 至 7 天的连续缺签。'); }
@@ -153,38 +171,15 @@ function wuai_sluyu_community_operation($operation, $user_id) {
         $result = wp_update_user(['ID'=>$user_id,'display_name'=>$name,'description'=>$description,'user_url'=>esc_url_raw(wuai_sluyu_input('user_url'), ['http','https'])]);
         return is_wp_error($result) ? $result : ['message'=>'资料已保存。'];
     }
-    if (in_array($operation, ['bookmark','follow','vote','news_vote'], true)) {
+    if (in_array($operation, ['bookmark','follow','news_vote'], true)) {
         if ($operation === 'follow') {
             if ($id === $user_id || !get_userdata($id) || wuai_sluyu_banned($id)) { return new WP_Error('user','无法关注该用户。'); }
         } elseif (!wuai_sluyu_public_post($id)) { return new WP_Error('post','内容不存在或尚未公开。'); }
         $key = $operation . ':' . $id; $exists = wuai_sluyu_has_event($user_id, $key);
-        if ($operation === 'vote') {
-            if (get_post_type($id) !== 'sluyu_topic' || get_post_meta($id, '_wuai_topic_kind', true) !== 'poll') { return new WP_Error('poll','此话题不是投票。'); }
-            $choices = get_post_meta($id, '_wuai_poll_choices', true); $choice = wuai_sluyu_input('choice');
-            if (!ctype_digit($choice) || !is_array($choices) || !isset($choices[(int)$choice])) { return new WP_Error('choice','请选择有效选项。'); }
-            if ($exists) { return new WP_Error('voted','你已经参与过这次投票。'); }
-            if (!wuai_sluyu_event($user_id, $key, 'vote', 0, $id, $choice)) { return new WP_Error('storage','投票未保存，请重试。'); }
-            return ['message'=>'投票成功。','reload'=>true];
-        }
         if ($operation === 'news_vote' && get_post_type($id) !== 'sluyu_news') { return new WP_Error('post','无效的快讯。'); }
         if ($exists) { $wpdb->delete($events, ['user_id'=>$user_id,'event_key'=>$key]); }
         elseif (!wuai_sluyu_event($user_id, $key, $operation, 0, $id, $operation === 'news_vote' ? (wuai_sluyu_input('direction') === 'down' ? 'down' : 'up') : '')) { return new WP_Error('storage','操作未保存，请重试。'); }
         return ['message'=>$exists ? '已取消。' : '操作成功。','selected'=>!$exists];
-    }
-    if ($operation === 'read_messages') {
-        $where = ['recipient_id'=>$user_id];
-        if ($id) { $where['sender_id'] = $id; $where['kind'] = 'message'; } else { $where['kind'] = 'notice'; }
-        $wpdb->update(wuai_sluyu_table('messages'), ['is_read'=>1], $where);
-        return ['message'=>'已标记为已读。','reload'=>true];
-    }
-    if ($operation === 'message') {
-        $recipient = get_user_by('login', wuai_sluyu_input('recipient'));
-        if (!$recipient && $id) { $recipient = get_userdata($id); }
-        $body = wuai_sluyu_input('body', true);
-        if (!$recipient || $recipient->ID === $user_id || wuai_sluyu_banned($recipient->ID)) { return new WP_Error('recipient','收件人不存在或无法接收私信。'); }
-        if (mb_strlen($body) < 1 || mb_strlen($body) > 2000) { return new WP_Error('body','私信应为 1–2000 字。'); }
-        $sent = $wpdb->insert(wuai_sluyu_table('messages'), ['sender_id'=>$user_id,'recipient_id'=>$recipient->ID,'kind'=>'message','body'=>$body,'created_at'=>current_time('mysql')]);
-        return $sent ? ['message'=>'私信已发送。','reload'=>true] : new WP_Error('storage','发送失败，请重试。');
     }
     if ($operation === 'submit' || $operation === 'verify' || $operation === 'report') {
         $kind = $operation === 'submit' ? wuai_sluyu_input('kind') : $operation;
@@ -201,15 +196,19 @@ function wuai_sluyu_community_operation($operation, $user_id) {
         $meta = ['_wuai_source_url'=>$url];
         if (in_array($kind, ['topic','question','poll'], true)) { $meta['_wuai_topic_kind'] = $kind; }
         if ($kind === 'poll') {
-            $choices = array_values(array_unique(array_filter(array_map('trim', explode("\n", wuai_sluyu_input('choices', true))))));
+            $choices = array_values(array_unique(array_filter(array_map('trim', explode("\n", wuai_sluyu_input('choices', true))), 'strlen')));
             if (count($choices) < 2 || count($choices) > 8 || max(array_map('mb_strlen', $choices)) > 100) { return new WP_Error('choices','投票需要 2–8 个不同选项，每项不超过 100 字。'); }
             $meta['_wuai_poll_choices'] = $choices;
         }
         if ($kind === 'report') { $meta['_wuai_report_target'] = $id; }
-        $post_id = wp_insert_post(wp_slash(['post_type'=>$types[$kind],'post_status'=>'pending','post_author'=>$user_id,'post_title'=>$title,'post_content'=>$body,'comment_status'=>in_array($kind,['topic','question','poll','post','news'],true)?'open':'closed','meta_input'=>$meta]), true);
+        $submission = ['post_type'=>$types[$kind],'post_status'=>'pending','post_author'=>$user_id,'post_title'=>$title,'post_content'=>$body,'comment_status'=>in_array($kind,['topic','question','poll','post','news'],true)?'open':'closed','meta_input'=>$meta];
+        $submission = apply_filters('wuai_sluyu_submission', $submission, $kind, $user_id);
+        if (is_wp_error($submission)) { return $submission; }
+        $post_id = wp_insert_post(wp_slash($submission), true);
         if (is_wp_error($post_id)) { return $post_id; }
         $group = absint(wuai_sluyu_input('group'));
         if ($types[$kind] === 'sluyu_topic' && $group && term_exists($group, 'sluyu_circle')) { wp_set_object_terms($post_id, [$group], 'sluyu_circle'); }
+        do_action('wuai_sluyu_after_submission', $post_id, $kind, $user_id);
         wuai_sluyu_notify($user_id, '你的「' . $title . '」已提交，等待管理员审核。');
         return ['message'=>'已提交审核，通过后才会公开。','reset'=>true];
     }
@@ -223,7 +222,8 @@ function wuai_sluyu_community_operation($operation, $user_id) {
 }
 
 function wuai_sluyu_community_ajax() {
-    check_ajax_referer('wuai_sluyu', 'nonce');
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { wp_send_json_error(['message'=>'请使用表单提交此操作。'], 405); }
+    if (!wp_verify_nonce(wuai_sluyu_input('nonce'),'wuai_sluyu')) { wp_send_json_error(['message'=>'安全校验已过期，请刷新页面重试。'],403); }
     if (!is_user_logged_in()) { wp_send_json_error(['message'=>'请先登录后再操作。','login'=>wp_login_url()], 401); }
     $user_id = get_current_user_id();
     if (wuai_sluyu_banned($user_id)) { wp_send_json_error(['message'=>'账户处于禁言期，暂时无法操作。'], 403); }
@@ -231,13 +231,16 @@ function wuai_sluyu_community_ajax() {
     $lock = wuai_sluyu_lock('user_' . $user_id);
     if (!$lock) { wp_send_json_error(['message'=>'上一项操作正在处理，请稍后重试。'], 429); }
     try {
-        $limited = in_array($operation, ['submit','verify','report','message'], true);
+        $limited = in_array($operation, ['submit','verify','report','message','circle_create','circle_join','circle_member','edit_submission','withdraw_submission'], true);
         $rate_key = 'wuai_rate_' . $user_id . '_' . $operation;
         if ($limited && get_transient($rate_key)) { $result = new WP_Error('rate','提交过于频繁，请稍后再试。'); }
         else {
             $result = wuai_sluyu_community_operation($operation, $user_id);
             if ($limited && !is_wp_error($result)) { set_transient($rate_key, 1, 20); }
         }
+    } catch (Throwable $error) {
+        error_log('Wuai community operation failed: ' . sanitize_key($operation) . ' / ' . get_class($error));
+        $result = new WP_Error('operation_failed', '操作暂未完成，请刷新页面核对状态后重试。');
     } finally { wuai_sluyu_unlock($lock); }
     if (is_wp_error($result)) { wp_send_json_error(['message'=>$result->get_error_message()], 400); }
     wp_send_json_success($result);
@@ -246,7 +249,8 @@ add_action('wp_ajax_wuai_sluyu_community', 'wuai_sluyu_community_ajax');
 add_action('wp_ajax_nopriv_wuai_sluyu_community', 'wuai_sluyu_community_ajax');
 
 add_filter('preprocess_comment', function ($comment) {
-    if (is_user_logged_in() && wuai_sluyu_banned(get_current_user_id())) { wp_die('禁言期间不能发表评论。', '', ['response'=>403]); }
+    $permission=wuai_sluyu_comment_permission($comment);
+    if (is_wp_error($permission)) { wp_die(esc_html($permission->get_error_message()), '', ['response'=>403]); }
     return $comment;
 });
 add_action('transition_post_status', function ($new, $old, $post) {
@@ -254,12 +258,17 @@ add_action('transition_post_status', function ($new, $old, $post) {
     if ($new === 'publish') {
         if ($post->post_type === 'sluyu_verify') { update_user_meta($post->post_author, '_wuai_verified_title', sanitize_text_field($post->post_title)); }
         wuai_sluyu_notify($post->post_author, '「' . $post->post_title . '」已通过审核。');
-    } elseif ($old === 'publish' && $post->post_type === 'sluyu_verify') { delete_user_meta($post->post_author, '_wuai_verified_title'); }
+    } elseif ($old === 'publish' && $post->post_type === 'sluyu_verify') {
+        $remaining=get_posts(['post_type'=>'sluyu_verify','post_status'=>'publish','author'=>$post->post_author,'post__not_in'=>[$post->ID],'numberposts'=>1,'orderby'=>'date','order'=>'DESC']);
+        if ($remaining) { update_user_meta($post->post_author,'_wuai_verified_title',sanitize_text_field($remaining[0]->post_title)); }
+        else { delete_user_meta($post->post_author, '_wuai_verified_title'); }
+    }
 }, 10, 3);
 
 add_action('deleted_user', function ($user_id) {
     global $wpdb;
     $wpdb->delete(wuai_sluyu_table('events'), ['user_id'=>$user_id]);
     $wpdb->delete(wuai_sluyu_table('events'), ['event_type'=>'follow','target_id'=>$user_id]);
+    $wpdb->delete(wuai_sluyu_table('memberships'), ['user_id'=>$user_id]);
     $wpdb->query($wpdb->prepare('DELETE FROM ' . wuai_sluyu_table('messages') . ' WHERE sender_id=%d OR recipient_id=%d', $user_id, $user_id));
 });

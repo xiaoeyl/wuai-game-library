@@ -6,7 +6,7 @@ class Wuai_Sluyu_Widget extends WP_Widget {
         parent::__construct('wuai_sluyu_service', '森鹿语 · 功能小工具', ['description'=>'签到、任务、文章排行、作者、快讯、导航、会员、统计、广告和社群二维码。']);
     }
     public static function modes() {
-        return ['checkin'=>'每日签到','tasks'=>'任务进度','posts'=>'最新文章','popular'=>'热门排行','author'=>'作者信息','news'=>'最新快讯','links'=>'网址导航','vip'=>'会员中心','stats'=>'站点统计','ad'=>'图片广告','qr'=>'社群二维码'];
+        return ['checkin'=>'每日签到','tasks'=>'任务进度','posts'=>'最新文章','popular'=>'热门排行','author'=>'作者信息','news'=>'最新快讯','links'=>'网址导航','circles'=>'茶话会圈子','vip'=>'会员中心','stats'=>'站点统计','ad'=>'图片广告','qr'=>'社群二维码'];
     }
     public function form($instance) {
         $mode=$instance['mode']??'checkin';
@@ -28,6 +28,11 @@ class Wuai_Sluyu_Widget extends WP_Widget {
             echo '<div class="sluyu-widget-list">'; $rank=0;
             while($query->have_posts()) { $query->the_post(); $rank++; echo '<a href="' . esc_url(get_permalink()) . '"><b>' . $rank . '</b><span>' . esc_html(get_the_title()) . '<small>' . esc_html(get_the_date('m-d')) . '</small></span></a>'; }
             echo '</div>'; if(!$query->post_count)echo '<p class="sluyu-muted">暂无已发布内容</p>'; wp_reset_postdata();
+        } elseif($mode==='circles') {
+            echo '<div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">热门</a><a href="' . esc_url(wuai_sluyu_portal_url('circles',['scope'=>'joined'])) . '">我加入的</a><a href="' . esc_url(wuai_sluyu_portal_url('circles',['scope'=>'owned'])) . '">我创建的</a></div><div class="sluyu-widget-list">';
+            $terms=get_terms(['taxonomy'=>'sluyu_circle','hide_empty'=>false,'number'=>$count,'orderby'=>'count','order'=>'DESC']);
+            if(!is_wp_error($terms))foreach($terms as $term)echo '<a href="' . esc_url(get_term_link($term)) . '"><span>' . esc_html($term->name) . '<small>' . wuai_sluyu_circle_count($term->term_id) . ' 位会友</small></span></a>';
+            if(!$terms || is_wp_error($terms))echo '<p class="sluyu-muted">还没有开放的圈子</p>'; echo '</div>';
         } elseif($mode==='checkin') {
             echo '<p>每日签到 +' . absint(wuai_sluyu_option('checkin_points',10)) . ' 积分</p>';
             if(is_user_logged_in()) { $checked=get_user_meta(get_current_user_id(),'_wuai_sluyu_checkin_date',true)===wp_date('Y-m-d'); wuai_sluyu_action_button('checkin',$checked?'今日已签到':'立即签到',[],$checked); }

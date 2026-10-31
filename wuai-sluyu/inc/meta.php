@@ -32,7 +32,7 @@ function wuai_sluyu_resource_box($post) {
 }
 
 add_action('save_post', function ($post_id) {
-    if (!isset($_POST['wuai_sluyu_resource_nonce']) || !wp_verify_nonce($_POST['wuai_sluyu_resource_nonce'], 'wuai_sluyu_resource')) {
+    if (!wp_verify_nonce(wuai_sluyu_input('wuai_sluyu_resource_nonce'), 'wuai_sluyu_resource') || wp_is_post_revision($post_id)) {
         return;
     }
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -43,16 +43,16 @@ add_action('save_post', function ($post_id) {
     }
     foreach (['version', 'platform', 'download_url', 'download_password', 'title_badge'] as $key) {
         if (isset($_POST['wuai_sluyu_' . $key])) {
-            $value = wp_unslash($_POST['wuai_sluyu_' . $key]);
+            $value = wuai_sluyu_input('wuai_sluyu_' . $key);
             update_post_meta($post_id, '_wuai_sluyu_' . $key, $key === 'download_url' ? esc_url_raw($value, ['http', 'https']) : sanitize_text_field($value));
         }
     }
     if (isset($_POST['wuai_sluyu_download_access'])) {
-        $access = sanitize_key($_POST['wuai_sluyu_download_access']);
+        $access = sanitize_key(wuai_sluyu_input('wuai_sluyu_download_access'));
         update_post_meta($post_id, '_wuai_sluyu_download_access', in_array($access,['public','login','member'],true) ? $access : 'public');
     }
     if (isset($_POST['wuai_sluyu_title_badge_color'])) {
-        $color = sanitize_hex_color(wp_unslash($_POST['wuai_sluyu_title_badge_color']));
+        $color = sanitize_hex_color(wuai_sluyu_input('wuai_sluyu_title_badge_color'));
         update_post_meta($post_id, '_wuai_sluyu_title_badge_color', $color ?: '#ef0053');
     }
     update_post_meta($post_id, '_wuai_sluyu_featured', isset($_POST['wuai_sluyu_featured']) ? '1' : '0');

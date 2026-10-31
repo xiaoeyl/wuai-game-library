@@ -15,15 +15,16 @@ function wuai_sluyu_action_button($operation, $label, $data = [], $disabled = fa
 }
 function wuai_sluyu_form_start($operation) { echo '<form class="sluyu-community-form" data-operation="' . esc_attr($operation) . '"><div class="sluyu-form-status" role="status" aria-live="polite"></div>'; }
 function wuai_sluyu_form_end($label = '提交') { echo '<button type="submit" class="sluyu-action-primary">' . esc_html($label) . '</button></form>'; }
-function wuai_sluyu_portal_pagination($total, $key) {
+function wuai_sluyu_portal_pagination($total, $key, $page_key = 'pg', $extra = []) {
     if ($total < 2) { return; }
     $args=[];
-    foreach(['peer','group','kind','sort'] as $param) { if(isset($_GET[$param]) && is_scalar($_GET[$param]))$args[$param]=sanitize_text_field(wp_unslash($_GET[$param])); }
-    echo '<nav class="sluyu-portal-pagination" aria-label="分页">' . wp_kses_post(paginate_links(['base'=>add_query_arg('pg','%#%',wuai_sluyu_portal_url($key,$args)), 'format'=>'','current'=>max(1,absint($_GET['pg'] ?? 1)), 'total'=>$total, 'prev_text'=>'上一页','next_text'=>'下一页'])) . '</nav>';
+    foreach(['peer','group','kind','sort','scope','tab'] as $param) { if(isset($_GET[$param]) && is_scalar($_GET[$param]))$args[$param]=wuai_sluyu_query($param); }
+    if(!isset($args['group']) && wuai_sluyu_query('group')!=='')$args['group']=wuai_sluyu_query('group');
+    echo '<nav class="sluyu-portal-pagination" aria-label="分页">' . wp_kses_post(paginate_links(['base'=>add_query_arg($page_key,'%#%',wuai_sluyu_portal_url($key,array_merge($args,$extra))), 'format'=>'','current'=>wuai_sluyu_page_number($page_key), 'total'=>$total, 'prev_text'=>'上一页','next_text'=>'下一页'])) . '</nav>';
 }
 
 function wuai_sluyu_render_portal($key) {
-    $handlers = ['account'=>'account','mission'=>'mission','task'=>'task','gold'=>'gold','directmessage'=>'messages','message'=>'messages','verify'=>'verify','dark-room'=>'bans','submit'=>'submit','tools'=>'tools','document'=>'documents','more'=>'directory','circle'=>'feed','newsflashes'=>'feed','links'=>'feed'];
+    $handlers = ['account'=>'account_extended','mission'=>'mission','task'=>'task','gold'=>'gold','directmessage'=>'messages_extended','message'=>'messages_extended','verify'=>'verify','dark-room'=>'bans','submit'=>'submit','tools'=>'tools','document'=>'documents','more'=>'directory','circle'=>'feed','circles'=>'circles','newsflashes'=>'feed','links'=>'feed'];
     if (isset($handlers[$key])) { call_user_func('wuai_sluyu_view_' . $handlers[$key], $key); }
     elseif (in_array($key,['shop','carts','orders','coupons','vips'],true)) { wuai_sluyu_view_commerce($key); }
     elseif (isset(wuai_sluyu_portal_pages()[$key])) { wuai_sluyu_view_information($key); }
@@ -39,36 +40,7 @@ function wuai_sluyu_view_directory() {
     echo '</div>';
 }
 
-function wuai_sluyu_view_account() {
-    if (!wuai_sluyu_require_login()) { return; }
-    $user = wp_get_current_user(); $uid = $user->ID;
-    global $wpdb;
-    $following = (int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . wuai_sluyu_table('events') . " WHERE user_id=%d AND event_type='follow'", $uid));
-    $followers = (int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . wuai_sluyu_table('events') . " WHERE target_id=%d AND event_type='follow'", $uid));
-    echo '<section class="sluyu-panel"><div class="sluyu-profile-heading">' . get_avatar($uid,80) . '<div><h2>' . esc_html($user->display_name) . '</h2><p>' . esc_html(get_user_meta($uid,'_wuai_verified_title',true) ?: '普通用户') . ' · ' . (wuai_sluyu_member($uid) ? '会员有效' : '未开通会员') . '</p></div><a href="' . esc_url(wp_logout_url(home_url('/'))) . '">退出登录</a></div><div class="sluyu-stat-grid">';
-    foreach (['积分'=>wuai_sluyu_points($uid),'文章'=>count_user_posts($uid,'post',true),'关注'=>$following,'粉丝'=>$followers] as $label=>$value) { echo '<div><strong>' . esc_html($value) . '</strong><span>' . esc_html($label) . '</span></div>'; }
-    echo '</div></section><section class="sluyu-panel"><h2>我的资料</h2>';
-    wuai_sluyu_form_start('profile');
-    echo '<label>昵称<input name="display_name" maxlength="40" value="' . esc_attr($user->display_name) . '" required></label><label>个人简介<textarea name="description" maxlength="500">' . esc_textarea($user->description) . '</textarea></label><label>个人网站<input type="url" name="user_url" value="' . esc_attr($user->user_url) . '"></label>';
-    wuai_sluyu_form_end('保存资料');
-    echo '<p class="sluyu-muted">头像使用 WordPress 头像服务。安全操作：<a href="' . esc_url(wp_lostpassword_url()) . '">重置密码</a></p></section>';
-    echo '<section class="sluyu-panel"><h2>我的收藏</h2><div class="sluyu-compact-list">';
-    $bookmarks = wuai_sluyu_events($uid,'bookmark',100); $visible=0;
-    foreach ($bookmarks as $entry) {
-        $post=wuai_sluyu_public_post($entry->target_id); if (!$post) { continue; } $visible++;
-        echo '<div><a href="' . esc_url(get_permalink($post)) . '">' . esc_html($post->post_title) . '</a>';
-        wuai_sluyu_action_button('bookmark','移除',['id'=>$post->ID]); echo '</div>';
-    }
-    if (!$visible) { wuai_sluyu_empty('还没有账号收藏。登录后收藏文章，即可跨设备查看。'); }
-    echo '</div></section><section class="sluyu-panel"><h2>我的投稿与申请</h2><div class="sluyu-compact-list">';
-    $posts=get_posts(['post_type'=>['post','sluyu_topic','sluyu_news','sluyu_link','sluyu_verify','sluyu_ticket'],'author'=>$uid,'post_status'=>['publish','pending','draft'],'numberposts'=>30]);
-    foreach ($posts as $post) { echo '<div><span>' . esc_html($post->post_title) . '</span><small>' . esc_html(['publish'=>'已发布 / 已通过','pending'=>'审核中','draft'=>'草稿 / 需修改'][$post->post_status]) . '</small></div>'; }
-    if (!$posts) { wuai_sluyu_empty('还没有投稿或申请。'); }
-    echo '</div><a href="' . esc_url(wuai_sluyu_portal_url('submit')) . '">去发布中心 →</a></section><section class="sluyu-panel"><h2>我的关注</h2>';
-    $follows=wuai_sluyu_events($uid,'follow',100);
-    foreach ($follows as $entry) { $person=get_userdata($entry->target_id); if (!$person) { continue; } echo '<p><a href="' . esc_url(get_author_posts_url($person->ID)) . '">' . esc_html($person->display_name) . '</a> '; wuai_sluyu_action_button('follow','取消关注',['id'=>$person->ID]); echo '</p>'; }
-    if (!$follows) { wuai_sluyu_empty('还没有关注的作者。'); } echo '</section>';
-}
+function wuai_sluyu_view_account() { wuai_sluyu_view_account_extended(); }
 
 function wuai_sluyu_view_mission() {
     global $wpdb; $uid=get_current_user_id(); $today=wp_date('Y-m-d');
@@ -105,7 +77,7 @@ function wuai_sluyu_view_task() {
 
 function wuai_sluyu_view_gold() {
     if (!wuai_sluyu_require_login()) { return; }
-    $uid=get_current_user_id(); $page=max(1,absint($_GET['pg']??1));
+    $uid=get_current_user_id(); $page=wuai_sluyu_page_number();
     echo '<section class="sluyu-panel"><p>可用积分</p><h2 class="sluyu-big-number">' . wuai_sluyu_points($uid) . '</h2><p>积分由签到和任务获得，可用于补签。积分不是现金，不支持提现或兑换承诺。</p><a href="' . esc_url(wuai_sluyu_portal_url('orders')) . '">查看真实支付订单 →</a></section><section class="sluyu-panel"><h2>积分流水</h2><div class="sluyu-table-wrap"><table><thead><tr><th>时间</th><th>说明</th><th>积分变动</th></tr></thead><tbody>';
     $events=wuai_sluyu_events($uid,'',30,($page-1)*30);
     foreach($events as $entry) { if(!$entry->points)continue; echo '<tr><td>' . esc_html($entry->created_at) . '</td><td>' . esc_html($entry->payload) . '</td><td>' . ($entry->points>0?'+':'') . (int)$entry->points . '</td></tr>'; }
@@ -114,29 +86,7 @@ function wuai_sluyu_view_gold() {
     wuai_sluyu_portal_pagination(ceil($total/30),'gold'); echo '</section>';
 }
 
-function wuai_sluyu_view_messages($key) {
-    if(!wuai_sluyu_require_login())return;
-    global $wpdb; $uid=get_current_user_id(); $table=wuai_sluyu_table('messages'); $page=max(1,absint($_GET['pg']??1)); $offset=($page-1)*30;
-    if($key==='message') {
-        echo '<section class="sluyu-panel"><h2>我的通知</h2>'; wuai_sluyu_action_button('read_messages','全部标记已读');
-        $where=$wpdb->prepare("recipient_id=%d AND kind='notice'",$uid);
-    } else {
-        $peer=absint($_GET['peer']??0);
-        echo '<section class="sluyu-panel"><h2>写一封新私信</h2>'; wuai_sluyu_form_start('message');
-        echo '<label>收件人用户名<input name="recipient" autocomplete="off" value="' . esc_attr($peer && get_userdata($peer) ? get_userdata($peer)->user_login : '') . '" required></label><label>消息内容<textarea name="body" maxlength="2000" rows="4" required></textarea></label>'; wuai_sluyu_form_end('发送私信');
-        echo '</section><section class="sluyu-panel"><h2>往来私信</h2>';
-        if($peer) { $where=$wpdb->prepare("kind='message' AND ((sender_id=%d AND recipient_id=%d) OR (sender_id=%d AND recipient_id=%d))",$uid,$peer,$peer,$uid); wuai_sluyu_action_button('read_messages','此对话标记已读',['id'=>$peer]); }
-        else { $where=$wpdb->prepare("kind='message' AND (sender_id=%d OR recipient_id=%d)",$uid,$uid); }
-    }
-    $messages=$wpdb->get_results($wpdb->prepare("SELECT * FROM $table WHERE $where ORDER BY id DESC LIMIT 30 OFFSET %d",$offset));
-    foreach($messages as $message) {
-        $sender=get_userdata($message->sender_id); $recipient=get_userdata($message->recipient_id);
-        echo '<article class="sluyu-message"><header><strong>' . esc_html($sender?$sender->display_name:'系统通知') . '</strong><span>' . ($message->is_read || (int)$message->sender_id===$uid?'':'未读 · ') . esc_html($message->created_at) . '</span></header><p>' . nl2br(esc_html($message->body)) . '</p>';
-        if($key!=='message') { $other=(int)$message->sender_id===$uid?$recipient:$sender; if($other)echo '<a href="' . esc_url(wuai_sluyu_portal_url('directmessage',['peer'=>$other->ID])) . '">与 ' . esc_html($other->display_name) . ' 的对话 →</a>'; } echo '</article>';
-    }
-    if(!$messages)wuai_sluyu_empty('暂无消息。');
-    $count=(int)$wpdb->get_var("SELECT COUNT(*) FROM $table WHERE $where"); wuai_sluyu_portal_pagination(ceil($count/30),$key); echo '</section>';
-}
+function wuai_sluyu_view_messages($key) { wuai_sluyu_view_messages_extended($key); }
 
 function wuai_sluyu_view_verify() {
     echo '<section class="sluyu-panel"><h2>让你的热爱，被更多人认识</h2><p>填写真实专长与可公开核验的资料，管理员审核通过后展示认证称号。不要提交身份证、密码等敏感信息。</p>';
@@ -158,11 +108,13 @@ function wuai_sluyu_view_bans() {
 function wuai_sluyu_view_submit() {
     if(!wuai_sluyu_require_login())return;
     echo '<section class="sluyu-panel"><h2>每一份分享，都值得认真对待</h2><p>发布内容需经管理员审核。请确认拥有分享权限，不发布个人隐私、侵权或违法内容。</p>';
-    wuai_sluyu_form_start('submit'); $selected=sanitize_key($_GET['kind']??'topic');
+    wuai_sluyu_form_start('submit'); $selected=sanitize_key(wuai_sluyu_query('kind','topic'));
     echo '<label>发布类型<select name="kind">';
     foreach(['topic'=>'日常话题','question'=>'提问','poll'=>'投票','post'=>'文章投稿','news'=>'快讯爆料','link'=>'网址入驻','ticket'=>'工单 / 资源反馈'] as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected($value,$selected,false) . '>' . esc_html($label) . '</option>'; }
-    echo '</select></label><label>标题<input name="title" maxlength="120" required></label><label>正文 / 说明<textarea name="body" minlength="5" maxlength="20000" rows="8" required></textarea></label><label>来源或站点网址<input name="url" type="url" placeholder="https://"></label><label data-poll-field>投票选项（每行一个，2–8 项）<textarea name="choices" rows="4" maxlength="808"></textarea></label><label>茶话会分组<select name="group"><option value="0">未分组</option>';
-    $terms=get_terms(['taxonomy'=>'sluyu_circle','hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term)echo '<option value="' . absint($term->term_id) . '">' . esc_html($term->name) . '</option>';
+    echo '</select></label><label>标题<input name="title" maxlength="120" required></label><label>正文 / 说明<textarea name="body" minlength="5" maxlength="20000" rows="8" required></textarea></label><label>来源或站点网址<input name="url" type="url" placeholder="https://"></label>';
+    wuai_sluyu_poll_submission_fields();
+    echo '<label>茶话会分组（仅显示可发帖圈子）<select name="group"><option value="0">未分组</option>';
+    $terms=get_terms(['taxonomy'=>'sluyu_circle','hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term) { if(!wuai_sluyu_circle_can_post($term->term_id,get_current_user_id()))continue; echo '<option value="' . absint($term->term_id) . '" ' . selected(absint(wuai_sluyu_query('group')),$term->term_id,false) . '>' . esc_html($term->name) . '</option>'; }
     echo '</select></label>'; wuai_sluyu_form_end('提交审核'); echo '</section>';
 }
 
@@ -172,20 +124,22 @@ function wuai_sluyu_view_channel($key) {
     foreach($info[3] as $slug=>$name)echo '<a href="' . esc_url(wuai_sluyu_portal_url($slug)) . '">' . esc_html($name) . '</a>';
     echo '</div><form class="sluyu-filter-form" method="get" action="' . esc_url(wuai_sluyu_portal_url($key)) . '">';
     if(!get_option('permalink_structure'))echo '<input type="hidden" name="sluyu_page" value="' . esc_attr($key) . '">';
-    $sort=sanitize_key($_GET['sort']??'new'); echo '<label>排序<select name="sort">';
+    $sort=sanitize_key(wuai_sluyu_query('sort','new')); echo '<label>排序<select name="sort">';
     foreach(['new'=>'最新发布','modified'=>'最近更新','popular'=>'最多讨论'] as $value=>$label)echo '<option value="' . $value . '" ' . selected($sort,$value,false) . '>' . $label . '</option>';
     echo '</select></label><button class="sluyu-action-plain">筛选</button></form></section>';
     if(!$term) { wuai_sluyu_empty('此分类尚未创建或没有内容。管理员可在服务管理中初始化分类。'); return; }
-    $query=new WP_Query(['post_type'=>'post','post_status'=>'publish','has_password'=>false,'cat'=>$term->term_id,'posts_per_page'=>12,'paged'=>max(1,absint($_GET['pg']??1)),'orderby'=>['new'=>'date','modified'=>'modified','popular'=>'comment_count'][$sort]??'date','ignore_sticky_posts'=>true]);
+    $query=new WP_Query(['post_type'=>'post','post_status'=>'publish','has_password'=>false,'cat'=>$term->term_id,'posts_per_page'=>12,'paged'=>wuai_sluyu_page_number(),'orderby'=>['new'=>'date','modified'=>'modified','popular'=>'comment_count'][$sort]??'date','ignore_sticky_posts'=>true]);
     echo '<div class="sluyu-grid sluyu-channel-grid">'; while($query->have_posts()) { $query->the_post(); wuai_sluyu_render_card(); } echo '</div>'; if(!$query->post_count)wuai_sluyu_empty(); wp_reset_postdata(); wuai_sluyu_portal_pagination($query->max_num_pages,$key);
 }
 
 function wuai_sluyu_view_feed($key) {
     $config=['circle'=>['sluyu_topic','sluyu_circle','topic'],'newsflashes'=>['sluyu_news','sluyu_news_cat','news'],'links'=>['sluyu_link','sluyu_link_cat','link']][$key];
-    $group=absint($_GET['group']??0); $kind=sanitize_key($_GET['kind']??''); $page=max(1,absint($_GET['pg']??1));
-    echo '<section class="sluyu-panel"><div class="sluyu-panel-heading"><h2>' . esc_html(wuai_sluyu_portal_pages()[$key][0]) . '</h2><a class="sluyu-action-primary" href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>$config[2]])) . '">' . ($key==='links'?'申请入驻':'发布内容') . '</a></div><div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url($key)) . '">全部</a>';
+    $group=absint(wuai_sluyu_query('group')); $kind=sanitize_key(wuai_sluyu_query('kind')); $page=wuai_sluyu_page_number();
+    if($key==='circle' && $group) { if(!wuai_sluyu_circle($group)) { wuai_sluyu_empty('此圈子不存在或尚未开放。'); return; } wuai_sluyu_circle_header($group); }
+    echo '<section class="sluyu-panel"><div class="sluyu-panel-heading"><h2>' . esc_html(wuai_sluyu_portal_pages()[$key][0]) . '</h2><a class="sluyu-action-primary" href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>$config[2],'group'=>$group])) . '">' . ($key==='links'?'申请入驻':'发布内容') . '</a></div><div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url($key)) . '">全部</a>';
+    if($key==='circle')echo '<a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">圈子广场 / 创建圈子</a>';
     $terms=get_terms(['taxonomy'=>$config[1],'hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['group'=>$term->term_id])) . '">' . esc_html($term->name) . '</a>';
-    if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value])) . '">' . $label . '</a>';
+    if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value,'group'=>$group])) . '">' . $label . '</a>';
     echo '</div></section>';
     $args=['post_type'=>$config[0],'post_status'=>'publish','has_password'=>false,'posts_per_page'=>12,'paged'=>$page];
     if($group)$args['tax_query']=[['taxonomy'=>$config[1],'terms'=>$group]];
@@ -233,13 +187,7 @@ function wuai_sluyu_view_tools() {
 function wuai_sluyu_topic_content($content) {
     if(!is_singular(['sluyu_topic','sluyu_news','sluyu_link']) || !in_the_loop() || !is_main_query() || post_password_required())return $content;
     $id=get_the_ID(); $kind=get_post_meta($id,'_wuai_topic_kind',true); ob_start();
-    if($kind==='poll') {
-        $choices=get_post_meta($id,'_wuai_poll_choices',true); global $wpdb;
-        $counts=$wpdb->get_results($wpdb->prepare('SELECT payload,COUNT(*) AS total FROM ' . wuai_sluyu_table('events') . " WHERE target_id=%d AND event_type='vote' GROUP BY payload",$id),OBJECT_K);
-        echo '<section class="sluyu-panel"><h2>参与投票</h2>'; wuai_sluyu_form_start('vote'); echo '<input type="hidden" name="id" value="' . $id . '">';
-        foreach((array)$choices as $index=>$choice)echo '<label class="sluyu-poll-choice"><input type="radio" name="choice" value="' . $index . '" required> ' . esc_html($choice) . ' <span>' . (isset($counts[$index])?(int)$counts[$index]->total:0) . ' 票</span></label>';
-        wuai_sluyu_form_end('投票'); echo '</section>';
-    }
+    if($kind==='poll') { wuai_sluyu_poll_view($id); }
     if($kind==='question') { $accepted=absint(get_post_meta($id,'_wuai_accepted_comment',true)); $answer=$accepted?get_comment($accepted):null; if($answer && $answer->comment_approved==='1' && (int)$answer->comment_post_ID===$id)echo '<section class="sluyu-notice"><h3>已采纳的回答</h3><p>' . nl2br(esc_html($answer->comment_content)) . '</p></section>'; }
     $source=get_post_meta($id,'_wuai_source_url',true); if($source)echo '<p><a href="' . esc_url($source) . '" target="_blank" rel="nofollow noopener noreferrer">查看来源 / 访问网站 ↗</a></p>';
     return $content . ob_get_clean();

@@ -56,11 +56,12 @@ function wuai_sluyu_like_count($post_id) {
 }
 
 function wuai_sluyu_frontend_action() {
-    check_ajax_referer('wuai_sluyu', 'nonce');
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { wp_send_json_error(['message'=>'请使用表单提交此操作。'],405); }
+    if (!wp_verify_nonce(wuai_sluyu_input('nonce'),'wuai_sluyu')) { wp_send_json_error(['message'=>'安全校验已过期，请刷新页面重试。'],403); }
     if (!is_user_logged_in()) {
         wp_send_json_error(['message' => '请先登录后再操作。', 'login' => wp_login_url()], 401);
     }
-    $operation = isset($_POST['operation']) ? sanitize_key(wp_unslash($_POST['operation'])) : '';
+    $operation = sanitize_key(wuai_sluyu_input('operation'));
     $user_id = get_current_user_id();
     if (function_exists('wuai_sluyu_banned') && wuai_sluyu_banned($user_id)) {
         wp_send_json_error(['message' => '禁言期间暂时无法操作。'], 403);
@@ -69,18 +70,20 @@ function wuai_sluyu_frontend_action() {
         wuai_sluyu_community_ajax();
     }
     if ($operation === 'like') {
-        $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
+        $post_id = absint(wuai_sluyu_input('post_id'));
         $post = get_post($post_id);
         if (!$post || !in_array($post->post_type, ['post','sluyu_topic','sluyu_news','sluyu_link'], true) || $post->post_status !== 'publish' || post_password_required($post)) {
             wp_send_json_error(['message' => '这篇文章暂时无法操作。'], 403);
         }
         $key = '_wuai_sluyu_like_' . $post_id;
-        $liked = get_user_meta($user_id, $key, true) !== '1';
-        if ($liked) {
-            update_user_meta($user_id, $key, '1');
-        } else {
-            delete_user_meta($user_id, $key);
-        }
+        $lock=wuai_sluyu_lock('user_'.$user_id);
+        if(!$lock) { wp_send_json_error(['message'=>'上一项操作正在处理，请稍后重试。'],429); }
+        try {
+            wp_cache_delete($user_id,'user_meta');
+            $liked = get_user_meta($user_id, $key, true) !== '1';
+            if ($liked) { update_user_meta($user_id, $key, '1'); }
+            else { delete_user_meta($user_id, $key); }
+        } finally { wuai_sluyu_unlock($lock); }
         wp_send_json_success(['liked' => $liked, 'count' => wuai_sluyu_like_count($post_id), 'message' => $liked ? '感谢你的喜欢' : '已取消喜欢']);
     }
     wp_send_json_error(['message' => '无效的操作。'], 400);

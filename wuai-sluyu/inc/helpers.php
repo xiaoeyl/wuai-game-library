@@ -21,6 +21,27 @@ function wuai_sluyu_asset($path) {
     return trailingslashit(WUAI_SLUYU_URI) . 'assets/' . ltrim($path, '/');
 }
 
+function wuai_sluyu_query($key, $default = '') {
+    if (!isset($_GET[$key])) {
+        if ($key==='group' && isset($_GET['circle_id']) && is_scalar($_GET['circle_id'])) { return sanitize_text_field(wp_unslash((string)$_GET['circle_id'])); }
+        if ($key==='kind') {
+            $route=get_query_var('sluyu_page');
+            if (is_string($route) && isset(['write'=>'post','po-ask'=>'question','link-register'=>'link'][$route])) { return ['write'=>'post','po-ask'=>'question','link-register'=>'link'][$route]; }
+        }
+    }
+    return isset($_GET[$key]) && is_scalar($_GET[$key]) ? sanitize_text_field(wp_unslash((string) $_GET[$key])) : $default;
+}
+
+function wuai_sluyu_page_number($key = 'pg') {
+    return max(1, min(100000, absint(wuai_sluyu_query($key, '1'))));
+}
+
+function wuai_sluyu_parse_date($value, $format = 'Y-m-d') {
+    if (!is_string($value) || !$value || strlen($value)>100 || strpos($value,"\0")!==false) { return false; }
+    $date = DateTimeImmutable::createFromFormat('!' . $format, $value, wp_timezone());
+    return $date && $date->format($format) === $value ? $date : false;
+}
+
 function wuai_sluyu_image($post_id = 0, $size = 'wuai-sluyu-card') {
     $post_id = $post_id ?: get_the_ID();
     $url = get_the_post_thumbnail_url($post_id, $size);

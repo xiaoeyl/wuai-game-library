@@ -8,8 +8,8 @@
     box.textContent = message;
     if (!form) setTimeout(function () { box.hidden = true; }, 4500);
   }
-  function request(operation, values) {
-    var data = new URLSearchParams(values || {});
+  function request(operation, values, multipart) {
+    var data = multipart && values instanceof FormData ? values : new URLSearchParams(values || {});
     data.set('action', 'wuai_sluyu_community'); data.set('nonce', config.nonce); data.set('operation', operation);
     return fetch(config.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data }).then(function (response) {
       return response.json().catch(function () { throw new Error('服务返回异常，请刷新页面后重试。'); });
@@ -24,7 +24,7 @@
     event.preventDefault();
     if (form.dataset.busy) return;
     form.dataset.busy = '1'; var button = form.querySelector('[type=submit]'); button.disabled = true;
-    request(form.dataset.operation, new FormData(form)).then(function (data) {
+    request(form.dataset.operation, new FormData(form), form.enctype === 'multipart/form-data').then(function (data) {
       notify(data.message, form); if (data.reset) form.reset(); if (data.reload) location.reload();
     }).catch(function (error) { notify(error.message, form); }).finally(function () { button.disabled = false; delete form.dataset.busy; });
   });
@@ -32,7 +32,7 @@
     var button = event.target.closest('[data-community-action]');
     if (!button || button.disabled) return;
     if (button.dataset.confirm && !window.confirm(button.dataset.confirm)) return;
-    var values = {}; ['id','task','direction'].forEach(function (key) { if (button.dataset[key]) values[key] = button.dataset[key]; });
+    var values = {}; ['id','task','direction','decision','userId'].forEach(function (key) { if (button.dataset[key]) values[key === 'userId' ? 'user_id' : key] = button.dataset[key]; });
     button.disabled = true;
     request(button.dataset.communityAction, values).then(function (data) {
       notify(data.message);
@@ -80,7 +80,11 @@
     });
   });
   document.querySelectorAll('.sluyu-community-form select[name=kind]').forEach(function (select) {
-    function update() { var field = select.form.querySelector('[data-poll-field]'); if (field) field.hidden = select.value !== 'poll'; }
+    function update() { var field = select.form.querySelector('[data-poll-field]'); if (field) { field.hidden = select.value !== 'poll'; field.disabled = select.value !== 'poll'; } }
+    select.addEventListener('change', update); update();
+  });
+  document.querySelectorAll('select[name=poll_mode]').forEach(function (select) {
+    function update() { var field = select.form.querySelector('[data-poll-multiple]'); if (field) field.hidden = select.value !== 'multiple'; }
     select.addEventListener('change', update); update();
   });
 })();

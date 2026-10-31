@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WUAI_SLUYU_VERSION', '1.1.0');
+define('WUAI_SLUYU_VERSION', '1.2.0');
 define('WUAI_SLUYU_DIR', get_stylesheet_directory());
 define('WUAI_SLUYU_URI', get_stylesheet_directory_uri());
 
@@ -14,6 +14,12 @@ require_once WUAI_SLUYU_DIR . '/inc/github-updater.php';
 require_once WUAI_SLUYU_DIR . '/inc/frontend.php';
 require_once WUAI_SLUYU_DIR . '/inc/portal.php';
 require_once WUAI_SLUYU_DIR . '/inc/community.php';
+require_once WUAI_SLUYU_DIR . '/inc/community-permissions.php';
+require_once WUAI_SLUYU_DIR . '/inc/circles.php';
+require_once WUAI_SLUYU_DIR . '/inc/polls.php';
+require_once WUAI_SLUYU_DIR . '/inc/account.php';
+require_once WUAI_SLUYU_DIR . '/inc/messaging.php';
+require_once WUAI_SLUYU_DIR . '/inc/profile-media.php';
 require_once WUAI_SLUYU_DIR . '/inc/portal-views.php';
 require_once WUAI_SLUYU_DIR . '/inc/commerce.php';
 require_once WUAI_SLUYU_DIR . '/inc/services-admin.php';
