@@ -31,7 +31,7 @@ $seo_description = !empty($options['seo_description']) ? $options['seo_descripti
 </head>
 <body <?php body_class(); ?> data-sluyu-lightbox="<?php echo esc_attr(wuai_sluyu_option('enable_lightbox', '1')); ?>" data-sluyu-loader="<?php echo esc_attr(wuai_sluyu_option('enable_loader', '1')); ?>" data-sluyu-particles="<?php echo esc_attr(wuai_sluyu_option('enable_particles', '0')); ?>" data-sluyu-glass="<?php echo esc_attr(wuai_sluyu_option('glass_cards', '1')); ?>">
 <?php wp_body_open(); ?>
-<?php if (wuai_sluyu_option('enable_loader', '1')) : ?><div class="sluyu-page-loader wuai-sluyu-loader" aria-hidden="true"><span class="sluyu-loader-orbit"></span><strong><?php echo esc_html($options['site_title'] ?: get_bloginfo('name')); ?></strong></div><?php endif; ?>
+<?php get_template_part('template-parts/page-loader'); ?>
 <?php if (wuai_sluyu_option('enable_particles', '0')) : ?><div class="sluyu-particles wuai-sluyu-particles" aria-hidden="true"></div><?php endif; ?>
 <header class="sluyu-header">
     <div class="sluyu-container sluyu-header-inner">

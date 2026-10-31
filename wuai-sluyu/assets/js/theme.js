@@ -24,15 +24,6 @@
     }
   }
 
-  var loader = document.querySelector('.sluyu-page-loader');
-  var hideLoader = function () { if (loader) loader.classList.add('is-hidden'); };
-  if (loader && body.getAttribute('data-sluyu-loader') === '1') {
-    window.addEventListener('load', hideLoader);
-    window.setTimeout(hideLoader, 1800);
-  } else {
-    hideLoader();
-  }
-
   var topButton = document.querySelector('.sluyu-tool-top');
   if (topButton) {
     var tools = document.querySelector('.sluyu-floating-tools');

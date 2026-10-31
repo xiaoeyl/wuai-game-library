@@ -34,7 +34,7 @@
 发布新的 GitHub Release 时，上传顶层目录为 `wuai-sluyu` 的 ZIP，例如：
 
 ```text
-wuai-sluyu-v1.0.8.zip
+wuai-sluyu-v1.0.9.zip
 ```
 
 后台会通过 GitHub Releases API 检查新版本，不需要在主题中保存 PAT。
@@ -90,3 +90,11 @@ wuai-sluyu-v1.0.8.zip
 - 保留 WordPress 原生更新通知与 GitHub 正式版/预发布通道；服务器连接失败不会被显示为“已是最新版”。
 
 `python tests/prepare-updater.py` prepares a disposable local WordPress fixture for `node tests/updater.cjs`. Never deploy the fixture plugin. `WP_QA_SOURCE` selects an isolated release source; `WP_QA_POLL_URL` can point to a second local PHP worker to verify concurrent progress polling and refresh recovery.
+
+## v1.0.9
+
+- 合并重复的加载遮罩样式，修复圆圈被挤到屏幕左侧的问题；圆圈与站名在电脑和手机上居中。
+- 页面结构就绪后收起加载动画，不再等待背景视频、外链图片或页脚脚本；最迟约 2 秒自动结束。
+- 修复脚本延迟执行、禁用 JavaScript、前进后退和重复刷新时可能残留遮罩的问题；遮罩不拦截点击，兼容减少动态效果设置。
+
+`node tests/loader.cjs` 验证加载布局、慢资源、脚本缺失、无 JavaScript、返回缓存、刷新及动画开关。`WP_QA_SOURCE` 可指定独立发布目录。
