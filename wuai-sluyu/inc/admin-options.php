@@ -3,11 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Theme settings. The UI intentionally uses a small, self-contained framework
- * instead of shipping the commercial Zibll source. It follows the same useful
- * ideas: grouped tabs, cards, switches and a predictable settings API.
- */
+/** Theme settings stored under the existing option key. */
 function wuai_sluyu_defaults() {
     return [
         'site_logo' => '',
@@ -54,258 +50,278 @@ function wuai_sluyu_get_options() {
     return wp_parse_args((array) get_option('wuai_sluyu_options', []), wuai_sluyu_defaults());
 }
 
-function wuai_sluyu_admin_groups() {
-    return [
-        'dashboard' => ['label' => '概览', 'icon' => 'dashicons-dashboard', 'description' => '查看主题状态和常用入口'],
-        'basic' => ['label' => '基础设置', 'icon' => 'dashicons-admin-generic', 'description' => '站点标识、Logo 和页脚信息'],
-        'home' => ['label' => '首页布局', 'icon' => 'dashicons-format-image', 'description' => 'Hero、栏目和首页广告模块'],
-        'content' => ['label' => '文章与资源', 'icon' => 'dashicons-media-document', 'description' => '文章页、网盘下载区和元信息'],
-        'appearance' => ['label' => '界面美化', 'icon' => 'dashicons-art', 'description' => '颜色、卡片、移动端和交互效果'],
-        'seo' => ['label' => 'SEO 设置', 'icon' => 'dashicons-search', 'description' => '搜索摘要和社交分享信息'],
-        'update' => ['label' => '在线更新', 'icon' => 'dashicons-update', 'description' => 'GitHub Release 更新源'],
-    ];
-}
-
-add_action('admin_menu', function () {
-    add_menu_page('吾爱森鹿语主题设置', '吾爱森鹿语', 'manage_options', 'wuai-sluyu', 'wuai_sluyu_options_page', 'dashicons-art', 58);
-    add_submenu_page('wuai-sluyu', '主题设置', '主题设置', 'manage_options', 'wuai-sluyu', 'wuai_sluyu_options_page');
-});
-
-add_action('admin_enqueue_scripts', function ($hook) {
-    if (!in_array($hook, ['toplevel_page_wuai-sluyu', 'appearance_page_wuai-sluyu'], true)) {
-        return;
-    }
-    wp_enqueue_media();
-    wp_enqueue_style('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/css/admin.css', [], WUAI_SLUYU_VERSION);
-    wp_enqueue_script('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/js/admin.js', [], WUAI_SLUYU_VERSION, true);
-});
-
-add_filter('admin_body_class', function ($classes) {
-    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
-    if ($screen && in_array($screen->id, ['toplevel_page_wuai-sluyu', 'appearance_page_wuai-sluyu'], true)) {
-        $classes .= ' wuai-admin-screen';
-    }
-    return $classes;
-});
-
-add_action('admin_init', function () {
-    register_setting('wuai_sluyu_options', 'wuai_sluyu_options', [
-        'sanitize_callback' => function ($input) {
-            $defaults = wuai_sluyu_defaults();
-            $input = is_array($input) ? $input : [];
-            $text_keys = [
-                'site_title', 'site_description', 'hero_title', 'hero_notice', 'hot_words',
-                'sections', 'resource_badge', 'download_title', 'footer_text', 'seo_description',
-                'seo_keywords', 'github_owner', 'github_repo', 'github_channel',
-            ];
-            $url_keys = ['site_logo', 'site_icon', 'hero_video', 'hero_image', 'promo_image', 'ad_image'];
-            foreach ($text_keys as $key) {
-                $defaults[$key] = isset($input[$key]) ? sanitize_textarea_field($input[$key]) : $defaults[$key];
-            }
-            foreach ($url_keys as $key) {
-                $defaults[$key] = isset($input[$key]) ? esc_url_raw($input[$key]) : $defaults[$key];
-            }
-            foreach (['primary_color', 'accent_color', 'background_color'] as $key) {
-                $defaults[$key] = isset($input[$key]) ? (sanitize_hex_color($input[$key]) ?: $defaults[$key]) : $defaults[$key];
-            }
-            foreach (['border_radius', 'content_width'] as $key) {
-                $value = isset($input[$key]) ? absint($input[$key]) : absint($defaults[$key]);
-                $defaults[$key] = (string) max($key === 'content_width' ? 980 : 0, min($key === 'content_width' ? 1600 : 32, $value));
-            }
-            foreach (['show_post_meta', 'show_resource_box', 'enable_comments', 'show_floating_tools', 'show_mobile_nav', 'enable_lightbox', 'enable_loader', 'enable_particles', 'glass_cards', 'color_scrollbar', 'enable_og', 'legacy_html_links'] as $key) {
-                $defaults[$key] = isset($input[$key]) ? '1' : '0';
-            }
-            return $defaults;
-        },
-    ]);
-});
-
-function wuai_sluyu_options_page() {
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-    $options = wuai_sluyu_get_options();
-    $groups = wuai_sluyu_admin_groups();
-    $active = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'dashboard';
-    if (!isset($groups[$active])) {
-        $active = 'dashboard';
-    }
-    ?>
-    <div class="wrap wuai-admin-wrap" data-wuai-admin="1">
-        <header class="wuai-admin-header">
-            <div class="wuai-admin-brand">
-                <div class="wuai-admin-logo"><span class="dashicons dashicons-art"></span></div>
-                <div>
-                    <h1>吾爱森鹿语主题设置</h1>
-                    <p>用一套清晰的设置面板管理首页、文章资源和视觉效果。</p>
-                </div>
-            </div>
-            <div class="wuai-admin-header-actions">
-                <span class="wuai-version">版本 <?php echo esc_html(WUAI_SLUYU_VERSION); ?></span>
-                <a class="button" href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener">查看前台</a>
-                <a class="button button-primary" href="<?php echo esc_url(admin_url('update-core.php?force-check=1')); ?>">检查更新</a>
-            </div>
-        </header>
-
-        <form method="post" action="options.php" class="wuai-admin-form">
-            <?php settings_fields('wuai_sluyu_options'); ?>
-            <div class="wuai-admin-layout">
-                <aside class="wuai-admin-sidebar">
-                    <div class="wuai-sidebar-title">主题控制台</div>
-                    <nav aria-label="主题设置分组">
-                        <?php foreach ($groups as $slug => $group) : ?>
-                            <a class="wuai-admin-nav<?php echo $active === $slug ? ' is-active' : ''; ?>" href="#<?php echo esc_attr($slug); ?>" data-wuai-tab="<?php echo esc_attr($slug); ?>">
-                                <span class="dashicons <?php echo esc_attr($group['icon']); ?>"></span>
-                                <span><strong><?php echo esc_html($group['label']); ?></strong><small><?php echo esc_html($group['description']); ?></small></span>
-                                <?php if ($active === $slug) : ?><i class="dashicons dashicons-arrow-right-alt2"></i><?php endif; ?>
-                            </a>
-                        <?php endforeach; ?>
-                    </nav>
-                    <div class="wuai-sidebar-help"><span class="dashicons dashicons-lightbulb"></span><strong>配置提示</strong><p>保存设置后打开前台查看效果。图片和视频字段支持媒体库或外链地址。</p></div>
-                </aside>
-
-                <main class="wuai-admin-content">
-                    <div class="wuai-admin-savebar">
-                        <div><strong><?php echo esc_html($groups[$active]['label']); ?></strong><span><?php echo esc_html($groups[$active]['description']); ?></span></div>
-                        <button type="submit" class="button button-primary wuai-save-button"><span class="dashicons dashicons-saved"></span>保存全部设置</button>
-                    </div>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'dashboard' ? ' is-active' : ''; ?>" data-wuai-pane="dashboard">
-                        <div class="wuai-stat-grid">
-                            <div class="wuai-stat-card"><span class="dashicons dashicons-admin-appearance"></span><div><small>当前主题</small><strong>吾爱森鹿语</strong><em>已启用</em></div></div>
-                            <div class="wuai-stat-card"><span class="dashicons dashicons-wordpress"></span><div><small>运行环境</small><strong>WordPress</strong><em>PHP <?php echo esc_html(PHP_VERSION); ?></em></div></div>
-                            <div class="wuai-stat-card"><span class="dashicons dashicons-cloud"></span><div><small>更新通道</small><strong><?php echo esc_html($options['github_owner'] . '/' . $options['github_repo']); ?></strong><em>GitHub Release</em></div></div>
-                        </div>
-                        <div class="wuai-card wuai-welcome-card">
-                            <div class="wuai-card-icon"><span class="dashicons dashicons-admin-customizer"></span></div>
-                            <div><h2>欢迎使用吾爱森鹿语</h2><p>这是主题自己的设置框架，布局参考了子比后台的分组和卡片交互，但代码与命名空间均为本主题独立实现。你可以从左侧依次配置站点、首页、资源文章、视觉效果和在线更新。</p><div class="wuai-quick-links"><a href="#home" data-wuai-tab="home">配置首页</a><a href="#content" data-wuai-tab="content">配置资源文章</a><a href="#appearance" data-wuai-tab="appearance">调整界面美化</a></div></div>
-                        </div>
-                    </section>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'basic' ? ' is-active' : ''; ?>" data-wuai-pane="basic">
-                        <div class="wuai-card-grid">
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-admin-site-alt3"></span><div><h2>站点信息</h2><p>设置网站标题、描述和品牌标识。</p></div></div>
-                                <?php wuai_sluyu_field('site_title', '站点显示名称', $options, 'text', '用于加载动画和后台品牌区域'); ?>
-                                <?php wuai_sluyu_field('site_description', '站点简介', $options, 'textarea', '用于首页介绍和 SEO 描述的默认内容'); ?>
-                                <?php wuai_sluyu_field('site_logo', 'Logo 地址', $options, 'url', '留空时使用自定义 Logo 或主题默认 Logo'); ?>
-                                <?php wuai_sluyu_field('site_icon', '站点图标地址', $options, 'url', '可填写 32×32 或 64×64 PNG 地址'); ?>
-                            </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-admin-footer"></span><div><h2>页脚与站点链接</h2><p>控制页面底部展示的版权和说明文字。</p></div></div>
-                                <?php wuai_sluyu_field('footer_text', '页脚说明', $options, 'text'); ?>
-                                <div class="wuai-info-box"><span class="dashicons dashicons-info-outline"></span><p>菜单仍然使用 WordPress 原生“外观 → 菜单”管理，主题会自动读取主导航和页脚导航。</p></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'home' ? ' is-active' : ''; ?>" data-wuai-pane="home">
-                        <div class="wuai-card-grid wuai-card-grid-wide">
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-format-image"></span><div><h2>首页 Hero 区域</h2><p>配置首页顶部的大图、视频和搜索提示。</p></div></div>
-                                <?php wuai_sluyu_field('hero_title', '主标题', $options, 'text'); ?>
-                                <?php wuai_sluyu_field('hero_notice', '免责声明', $options, 'textarea'); ?>
-                                <?php wuai_sluyu_field('hero_video', '背景视频 URL', $options, 'url', '建议使用 mp4 外链；无法播放时会自动显示背景图片'); ?>
-                                <?php wuai_sluyu_field('hero_image', '背景图片 URL', $options, 'url'); ?>
-                                <?php wuai_sluyu_field('hot_words', '热搜词', $options, 'text', '使用逗号分隔，例如：黑神话,生化危机,游戏资源'); ?>
-                            </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-layout"></span><div><h2>首页模块</h2><p>控制栏目、横幅和侧栏广告资源。</p></div></div>
-                                <?php wuai_sluyu_field('sections', '首页栏目', $options, 'textarea', '每行一个已有分类名称，最多显示四个栏目；栏目只展示已发布文章，空栏目显示暂无内容，不生成演示文章'); ?>
-                                <?php wuai_sluyu_field('promo_image', '横幅图片 URL', $options, 'url'); ?>
-                                <?php wuai_sluyu_field('ad_image', '侧栏广告 URL', $options, 'url'); ?>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'content' ? ' is-active' : ''; ?>" data-wuai-pane="content">
-                        <div class="wuai-card-grid">
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-media-document"></span><div><h2>文章页显示</h2><p>适用于游戏资源文章和普通资讯文章。</p></div></div>
-                                <?php wuai_sluyu_field('resource_badge', '默认标题徽章', $options, 'text', '文章没有单独设置徽章时使用'); ?>
-                                <?php wuai_sluyu_field('download_title', '网盘下载区标题', $options, 'text'); ?>
-                                <?php wuai_sluyu_field('show_post_meta', '显示文章作者和时间', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('show_resource_box', '显示网盘资源卡片', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('enable_comments', '开启文章评论区', $options, 'checkbox'); ?>
-                            </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-editor-help"></span><div><h2>发布提示</h2><p>资源文章建议使用文章编辑页的“游戏资源信息”面板。</p></div></div>
-                                <div class="wuai-guide-list"><div><b>01</b><span>设置特色图片，首页卡片会自动使用。</span></div><div><b>02</b><span>在资源信息中填写网盘地址和提取码。</span></div><div><b>03</b><span>给文章分配“游戏资源”或“资讯”分类。</span></div></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'appearance' ? ' is-active' : ''; ?>" data-wuai-pane="appearance">
-                        <div class="wuai-card-grid">
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-art"></span><div><h2>颜色与布局</h2><p>调整主题的粉色强调和卡片尺寸。</p></div></div>
-                                <?php wuai_sluyu_field('primary_color', '主题色', $options, 'color'); ?>
-                                <?php wuai_sluyu_field('accent_color', '辅助色', $options, 'color'); ?>
-                                <?php wuai_sluyu_field('background_color', '页面背景色', $options, 'color'); ?>
-                                <?php wuai_sluyu_field('border_radius', '卡片圆角', $options, 'number', '范围 0–32 像素'); ?>
-                                <?php wuai_sluyu_field('content_width', '内容最大宽度', $options, 'number', '范围 980–1600 像素'); ?>
-                            </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-admin-customizer"></span><div><h2>交互与美化</h2><p>按服务器性能选择动画和移动端组件。</p></div></div>
-                                <?php wuai_sluyu_field('show_floating_tools', '显示右侧悬浮工具栏', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('show_mobile_nav', '显示移动端底部导航', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('enable_lightbox', '文章图片灯箱预览', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('enable_loader', '页面加载动画', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('enable_particles', '背景粒子效果', $options, 'checkbox', '移动端会自动降低强度'); ?>
-                                <?php wuai_sluyu_field('glass_cards', '卡片玻璃拟态效果', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('color_scrollbar', '彩色滚动条与选中文字', $options, 'checkbox'); ?>
-                                <?php wuai_sluyu_field('legacy_html_links', '兼容旧版 .html 链接', $options, 'checkbox'); ?>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'seo' ? ' is-active' : ''; ?>" data-wuai-pane="seo">
-                        <div class="wuai-card-grid">
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-search"></span><div><h2>搜索引擎摘要</h2><p>为首页和社交分享补充统一描述。</p></div></div>
-                                <?php wuai_sluyu_field('seo_description', 'SEO 描述', $options, 'textarea', '建议 80–160 个中文字符'); ?>
-                                <?php wuai_sluyu_field('seo_keywords', 'SEO 关键词', $options, 'text', '使用逗号分隔'); ?>
-                                <?php wuai_sluyu_field('enable_og', '输出 Open Graph 分享信息', $options, 'checkbox'); ?>
-                            </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-yes-alt"></span><div><h2>主题状态</h2><p>当前设置使用 WordPress 原生保存机制。</p></div></div><div class="wuai-info-box success"><span class="dashicons dashicons-yes"></span><p>保存后会立即写入主题设置，不需要重新安装或修改数据库表。</p></div></div>
-                        </div>
-                    </section>
-
-                    <section class="wuai-tab-pane<?php echo $active === 'update' ? ' is-active' : ''; ?>" data-wuai-pane="update">
-                        <div class="wuai-card-grid">
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-update"></span><div><h2>GitHub 在线更新</h2><p>后台会通过公开 Release 检查新版本，不保存 PAT。</p></div></div>
-                                <?php wuai_sluyu_field('github_owner', '仓库账号', $options, 'text', '例如：xiaoeyl'); ?>
-                                <?php wuai_sluyu_field('github_repo', '仓库名称', $options, 'text', '例如：wuai-game-library'); ?>
-                                <?php wuai_sluyu_field('github_channel', '更新通道', $options, 'select', '', ['stable' => '稳定版 Release', 'beta' => '测试版 Release']); ?>
-                                <div class="wuai-update-actions"><a class="button button-primary" href="<?php echo esc_url(admin_url('update-core.php?force-check=1')); ?>">立即检查主题更新</a><a class="button" href="<?php echo esc_url('https://github.com/' . rawurlencode($options['github_owner']) . '/' . rawurlencode($options['github_repo']) . '/releases'); ?>" target="_blank" rel="noopener">打开 GitHub Releases</a></div>
-                            </div>
-                            <div class="wuai-card"><div class="wuai-card-heading"><span class="dashicons dashicons-shield"></span><div><h2>更新说明</h2><p>发布新版本时，请使用主题 ZIP 作为 Release 附件。</p></div></div><div class="wuai-guide-list"><div><b>01</b><span>上传命名为 <code>wuai-sluyu-v<?php echo esc_html(WUAI_SLUYU_VERSION); ?>.zip</code> 的压缩包。</span></div><div><b>02</b><span>创建 GitHub Release，并填写版本标签。</span></div><div><b>03</b><span>回到后台“仪表盘 → 更新”执行检查。</span></div></div></div>
-                        </div>
-                    </section>
-                </main>
-            </div>
-        </form>
-    </div>
-    <?php
-}
-
-function wuai_sluyu_field($key, $label, $options, $type = 'text', $description = '', $choices = []) {
-    $value = isset($options[$key]) ? $options[$key] : '';
-    $name = 'wuai_sluyu_options[' . $key . ']';
-    $id = 'wuai-sluyu-' . sanitize_html_class($key);
-    echo '<div class="wuai-field wuai-field-' . esc_attr($type) . '">';
-    echo '<label for="' . esc_attr($id) . '"><span class="wuai-field-label">' . esc_html($label) . '</span>';
-    if ($type === 'textarea') {
-        printf('<textarea id="%1$s" name="%2$s" rows="4">%3$s</textarea>', esc_attr($id), esc_attr($name), esc_textarea($value));
-    } elseif ($type === 'color') {
-        printf('<span class="wuai-color-input"><input id="%1$s" type="color" name="%2$s" value="%3$s"><code>%3$s</code></span>', esc_attr($id), esc_attr($name), esc_attr($value));
-    } elseif ($type === 'checkbox') {
-        printf('<span class="wuai-switch"><input id="%1$s" type="checkbox" name="%2$s" value="1" %3$s><i aria-hidden="true"></i><b>开启</b></span>', esc_attr($id), esc_attr($name), checked($value, '1', false));
-    } elseif ($type === 'select') {
-        echo '<select id="' . esc_attr($id) . '" name="' . esc_attr($name) . '">';
-        foreach ((array) $choices as $choice_value => $choice_label) {
-            printf('<option value="%1$s" %2$s>%3$s</option>', esc_attr($choice_value), selected($value, $choice_value, false), esc_html($choice_label));
+/** Use the same value format as the front end, including disabled switches. */
+function wuai_sluyu_sanitize_options($input) {
+    $defaults = wuai_sluyu_defaults();
+    $input = is_array($input) ? $input : [];
+    $output = $defaults;
+    $switches = ['show_post_meta', 'show_resource_box', 'enable_comments', 'show_floating_tools', 'show_mobile_nav', 'enable_lightbox', 'enable_loader', 'enable_particles', 'glass_cards', 'color_scrollbar', 'enable_og', 'legacy_html_links'];
+    $urls = ['site_logo', 'site_icon', 'hero_video', 'hero_image', 'promo_image', 'ad_image'];
+    $multiline = ['site_description', 'hero_notice', 'sections', 'seo_description', 'footer_text'];
+    foreach ($defaults as $key => $default) {
+        if (!array_key_exists($key, $input) || !is_scalar($input[$key])) {
+            continue;
         }
-        echo '</select>';
-    } elseif ($type === 'url') {
-        printf('<span class="wuai-url-input"><input id="%1$s" type="url" name="%2$s" value="%3$s"><button type="button" class="button wuai-media-button" data-wuai-target="%1$s">选择媒体</button></span>', esc_attr($id), esc_attr($name), esc_attr($value));
-    } else {
-        printf('<input id="%1$s" type="%2$s" name="%3$s" value="%4$s">', esc_attr($id), $type === 'number' ? 'number' : 'text', esc_attr($name), esc_attr($value));
+        $value = (string) $input[$key];
+        if (in_array($key, $switches, true)) {
+            $output[$key] = in_array(strtolower($value), ['1', 'true', 'on', 'yes'], true) ? '1' : '0';
+        } elseif (in_array($key, $urls, true)) {
+            $output[$key] = esc_url_raw($value, ['http', 'https']);
+        } elseif (in_array($key, ['primary_color', 'accent_color', 'background_color'], true)) {
+            $output[$key] = sanitize_hex_color($value) ?: $default;
+        } elseif ($key === 'border_radius' || $key === 'content_width') {
+            $output[$key] = (string) max($key === 'content_width' ? 980 : 0, min($key === 'content_width' ? 1600 : 32, absint($value)));
+        } elseif ($key === 'github_channel') {
+            $output[$key] = in_array($value, ['stable', 'beta'], true) ? $value : 'stable';
+        } elseif ($key === 'github_owner' || $key === 'github_repo') {
+            $output[$key] = preg_replace('/[^a-zA-Z0-9_.-]/', '', $value);
+        } elseif (in_array($key, $multiline, true)) {
+            $output[$key] = sanitize_textarea_field($value);
+        } else {
+            $output[$key] = sanitize_text_field($value);
+        }
     }
-    echo '</label>';
-    if ($description !== '') {
-        echo '<p class="wuai-field-description">' . esc_html($description) . '</p>';
-    }
-    echo '</div>';
+    return $output;
 }
+
+/** Every write path (CSF save/import/reset/restore) shares validation and history. */
+add_filter('pre_update_option_wuai_sluyu_options', function ($value, $previous) {
+    $value = wuai_sluyu_sanitize_options($value);
+    if (is_array($previous) && $previous && $previous !== $value) {
+        wuai_sluyu_backup_options('更改前自动备份', $previous);
+    }
+    return $value;
+}, 10, 2);
+
+function wuai_sluyu_backup_options($reason = '手动备份', $options = null) {
+    $options = $options === null ? wuai_sluyu_get_options() : $options;
+    $backups = get_option('wuai_sluyu_options_backups', []);
+    $backups = is_array($backups) ? $backups : [];
+    $id = wp_generate_uuid4();
+    $backups[$id] = [
+        'time' => current_time('Y-m-d H:i:s'),
+        'reason' => $reason,
+        'data' => is_array($options) ? $options : [],
+    ];
+    update_option('wuai_sluyu_options_backups', array_slice($backups, -20, null, true), false);
+    return $id;
+}
+
+function wuai_sluyu_settings_history_action() {
+    if (!current_user_can('manage_options')) {
+        wp_die('你没有管理主题设置的权限。', '', ['response' => 403]);
+    }
+    check_admin_referer('wuai_sluyu_settings_history');
+    $operation = isset($_POST['operation']) ? sanitize_key(wp_unslash($_POST['operation'])) : '';
+    if ($operation === 'backup') {
+        wuai_sluyu_backup_options();
+    } elseif ($operation === 'restore') {
+        $id = isset($_POST['backup_id']) ? sanitize_text_field(wp_unslash($_POST['backup_id'])) : '';
+        $backups = get_option('wuai_sluyu_options_backups', []);
+        if (!isset($backups[$id]['data']) || !is_array($backups[$id]['data'])) {
+            wp_die('此备份已不存在。', '', ['response' => 400]);
+        }
+        update_option('wuai_sluyu_options', $backups[$id]['data']);
+    } else {
+        wp_die('无效的备份操作。', '', ['response' => 400]);
+    }
+    wp_safe_redirect(admin_url('admin.php?page=wuai-sluyu&settings-history=' . $operation) . '#tab=' . rawurlencode('备份与恢复'));
+    exit;
+}
+add_action('admin_post_wuai_sluyu_settings_history', 'wuai_sluyu_settings_history_action');
+
+/** Bootstrap the actual CSF core and the supplied Zibll overrides before init. */
+function wuai_sluyu_load_settings_framework() {
+    if (!is_admin()) {
+        return;
+    }
+    if (!class_exists('CSF', false)) {
+        add_filter('csf_override', function () { return 'inc/csf-framework'; });
+        add_filter('csf_fa4', '__return_true');
+        require_once WUAI_SLUYU_DIR . '/inc/codestar-framework/codestar-framework.php';
+    }
+    wuai_sluyu_register_csf_options();
+}
+add_action('after_setup_theme', 'wuai_sluyu_load_settings_framework', 20);
+
+function wuai_sluyu_csf_field($id, $type, $title, $extra = []) {
+    $field = ['id' => $id, 'type' => $type, 'title' => $title];
+    if ($type === 'switcher') {
+        $field += ['text_on' => '开启', 'text_off' => '关闭'];
+    }
+    if ($type === 'upload') {
+        $field += ['library' => 'image', 'preview' => true, 'button_title' => '选择图片', 'remove_title' => '移除'];
+    }
+    return array_merge($field, $extra);
+}
+
+function wuai_sluyu_register_csf_options() {
+    $prefix = 'wuai_sluyu_options';
+    CSF::createOptions($prefix, [
+        'menu_title' => '吾爱森鹿语',
+        'menu_slug' => 'wuai-sluyu',
+        'menu_icon' => 'dashicons-art',
+        'menu_position' => 58,
+        'menu_capability' => 'manage_options',
+        'framework_title' => '吾爱森鹿语 <small>V' . WUAI_SLUYU_VERSION . '</small>',
+        'framework_class' => 'wuai-csf-settings',
+        'theme' => 'light',
+        'show_bar_menu' => false,
+        'show_sub_menu' => false,
+        'show_in_network' => false,
+        'show_search' => true,
+        'show_reset_all' => true,
+        'show_reset_section' => true,
+        'show_all_options' => true,
+        'show_form_warning' => true,
+        'ajax_save' => true,
+        'save_defaults' => false,
+        'output_css' => false,
+        'enqueue_webfont' => false,
+        'defaults' => wuai_sluyu_defaults(),
+        'footer_text' => '吾爱森鹿语 · CSF 2.2.0 / 子比设置面板',
+        'footer_credit' => '吾爱森鹿语主题设置',
+    ]);
+    CSF::createSection($prefix, [
+        'title' => '主题概览', 'icon' => 'fa fa-dashboard',
+        'fields' => [['type' => 'callback', 'function' => 'wuai_sluyu_csf_overview']],
+    ]);
+    CSF::createSection($prefix, ['id' => 'basic', 'title' => '基础设置', 'icon' => 'fa fa-cog']);
+    CSF::createSection($prefix, [
+        'parent' => 'basic', 'title' => '站点信息', 'icon' => 'fa fa-globe',
+        'fields' => [
+            wuai_sluyu_csf_field('site_title', 'text', '站点显示名称'),
+            wuai_sluyu_csf_field('site_description', 'textarea', '站点简介'),
+            wuai_sluyu_csf_field('site_logo', 'upload', '网站 Logo', ['desc' => '支持媒体库或图片外链；留空使用 WordPress 自定义 Logo 或默认 Logo。']),
+            wuai_sluyu_csf_field('site_icon', 'upload', '站点图标', ['desc' => '建议使用正方形 PNG 图片。']),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'parent' => 'basic', 'title' => '页脚与导航', 'icon' => 'fa fa-bars',
+        'fields' => [
+            wuai_sluyu_csf_field('footer_text', 'textarea', '页脚说明'),
+            ['type' => 'content', 'content' => '<p>主导航和页脚导航使用 WordPress 菜单管理。</p><a class="button" href="' . esc_url(admin_url('nav-menus.php')) . '">管理导航菜单</a>'],
+        ],
+    ]);
+    CSF::createSection($prefix, ['id' => 'home', 'title' => '首页布局', 'icon' => 'fa fa-home']);
+    CSF::createSection($prefix, [
+        'parent' => 'home', 'title' => '首屏与搜索', 'icon' => 'fa fa-picture-o',
+        'fields' => [
+            wuai_sluyu_csf_field('hero_title', 'text', '首屏主标题'),
+            wuai_sluyu_csf_field('hero_notice', 'textarea', '首页公告'),
+            wuai_sluyu_csf_field('hero_video', 'upload', '背景视频', ['library' => 'video', 'preview' => false, 'button_title' => '选择视频', 'desc' => '支持 MP4 外链或媒体库视频；视频不能播放时使用背景图片。']),
+            wuai_sluyu_csf_field('hero_image', 'upload', '背景图片'),
+            wuai_sluyu_csf_field('hot_words', 'text', '热搜关键词', ['desc' => '使用英文或中文逗号分隔。']),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'parent' => 'home', 'title' => '栏目与广告', 'icon' => 'fa fa-th-large',
+        'fields' => [
+            wuai_sluyu_csf_field('sections', 'textarea', '首页栏目', ['desc' => '每行一个已有分类名称，最多显示四个栏目。只显示已发布文章，空栏目不生成演示文章。']),
+            wuai_sluyu_csf_field('promo_image', 'upload', '首页横幅'),
+            wuai_sluyu_csf_field('ad_image', 'upload', '侧栏广告图片'),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'title' => '文章与资源', 'icon' => 'fa fa-file-text-o',
+        'fields' => [
+            wuai_sluyu_csf_field('resource_badge', 'text', '默认标题徽章'),
+            wuai_sluyu_csf_field('download_title', 'text', '网盘下载区标题'),
+            wuai_sluyu_csf_field('show_post_meta', 'switcher', '显示文章信息'),
+            wuai_sluyu_csf_field('show_resource_box', 'switcher', '显示资源下载区'),
+            wuai_sluyu_csf_field('enable_comments', 'switcher', '显示文章评论'),
+            wuai_sluyu_csf_field('legacy_html_links', 'switcher', '使用 .html 文章地址', ['desc' => '更改后请在“设置 → 固定链接”保存一次，刷新重写规则。']),
+        ],
+    ]);
+    CSF::createSection($prefix, ['id' => 'appearance', 'title' => '界面美化', 'icon' => 'fa fa-paint-brush']);
+    CSF::createSection($prefix, [
+        'parent' => 'appearance', 'title' => '颜色与布局', 'icon' => 'fa fa-adjust',
+        'fields' => [
+            wuai_sluyu_csf_field('primary_color', 'color', '主色调'),
+            wuai_sluyu_csf_field('accent_color', 'color', '辅助色'),
+            wuai_sluyu_csf_field('background_color', 'color', '页面背景色'),
+            wuai_sluyu_csf_field('border_radius', 'number', '卡片圆角', ['unit' => 'px', 'attributes' => ['min' => 0, 'max' => 32]]),
+            wuai_sluyu_csf_field('content_width', 'number', '内容区域宽度', ['unit' => 'px', 'attributes' => ['min' => 980, 'max' => 1600]]),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'parent' => 'appearance', 'title' => '交互与特效', 'icon' => 'fa fa-magic',
+        'fields' => [
+            wuai_sluyu_csf_field('show_floating_tools', 'switcher', '显示悬浮工具'),
+            wuai_sluyu_csf_field('show_mobile_nav', 'switcher', '显示移动端底部导航'),
+            wuai_sluyu_csf_field('enable_lightbox', 'switcher', '文章图片灯箱'),
+            wuai_sluyu_csf_field('enable_loader', 'switcher', '页面加载动画'),
+            wuai_sluyu_csf_field('enable_particles', 'switcher', '粒子背景'),
+            wuai_sluyu_csf_field('glass_cards', 'switcher', '玻璃卡片效果'),
+            wuai_sluyu_csf_field('color_scrollbar', 'switcher', '彩色滚动条'),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'title' => 'SEO 设置', 'icon' => 'fa fa-search',
+        'fields' => [
+            wuai_sluyu_csf_field('seo_description', 'textarea', '首页 SEO 描述'),
+            wuai_sluyu_csf_field('seo_keywords', 'text', '首页关键词'),
+            wuai_sluyu_csf_field('enable_og', 'switcher', '社交分享信息'),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'title' => '在线更新', 'icon' => 'fa fa-refresh',
+        'fields' => [
+            ['type' => 'callback', 'function' => 'wuai_sluyu_csf_update_info'],
+            wuai_sluyu_csf_field('github_owner', 'text', 'GitHub 用户名'),
+            wuai_sluyu_csf_field('github_repo', 'text', 'GitHub 仓库名'),
+            wuai_sluyu_csf_field('github_channel', 'select', '更新通道', ['options' => ['stable' => '正式版', 'beta' => '预发布版'], 'desc' => '正式版读取最新 Release，预发布版同时检查标记为预发布的版本。']),
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'title' => '备份与恢复', 'icon' => 'fa fa-database',
+        'fields' => [
+            ['type' => 'notice', 'style' => 'info', 'content' => '修改、导入或重置前自动保留原配置，最多保存 20 份。备份仅包含主题设置，不包含文章和媒体文件。'],
+            ['type' => 'backup', 'title' => '导入 / 导出设置'],
+            ['type' => 'callback', 'function' => 'wuai_sluyu_csf_history'],
+        ],
+    ]);
+}
+
+function wuai_sluyu_csf_overview() {
+    echo '<div class="wuai-csf-overview"><h2>吾爱森鹿语 V' . esc_html(WUAI_SLUYU_VERSION) . '</h2>';
+    echo '<p>设置面板使用用户提供的子比源码中的 Codestar Framework 2.2.0 核心与子比设置层。左侧选择分组，右上角可搜索、保存或重置设置。</p>';
+    echo '<p>站点信息、首页布局、资源文章和美化设置沿用原配置，前台内容读取 WordPress 已发布文章。</p>';
+    echo '<p><a class="button button-primary" href="' . esc_url(home_url('/')) . '" target="_blank" rel="noopener">查看网站</a> ';
+    echo '<a class="button" href="' . esc_url(admin_url('post-new.php')) . '">发布文章</a> ';
+    echo '<a class="button" href="' . esc_url(admin_url('edit-tags.php?taxonomy=category')) . '">管理分类</a></p>';
+    echo '<p class="description">WordPress ' . esc_html(get_bloginfo('version')) . ' · PHP ' . esc_html(PHP_VERSION) . ' · CSF ' . esc_html(CSF::$version) . '</p></div>';
+}
+
+function wuai_sluyu_csf_update_info() {
+    echo '<p>当前主题版本：<strong>' . esc_html(WUAI_SLUYU_VERSION) . '</strong>。更新继续通过你自己的 GitHub Releases 发布，由 WordPress 检测并安装。</p>';
+    echo '<p>修改更新源或通道后请先保存，再点击检查更新。</p><a class="button button-primary" href="' . esc_url(admin_url('update-core.php?force-check=1')) . '">手动检查更新</a>';
+}
+
+function wuai_sluyu_csf_history() {
+    $backups = get_option('wuai_sluyu_options_backups', []);
+    $nonce = wp_create_nonce('wuai_sluyu_settings_history');
+    echo '<h3>历史配置备份</h3><p><button type="button" class="button wuai-csf-history-action" data-operation="backup" data-nonce="' . esc_attr($nonce) . '">立即备份当前配置</button></p>';
+    echo '<p class="description">恢复操作会先备份当前配置。恢复前请保存或放弃尚未保存的修改。</p>';
+    if (!is_array($backups) || !$backups) {
+        echo '<p>暂无历史备份，首次保存更改时会自动生成。</p>';
+        return;
+    }
+    echo '<table class="widefat striped"><thead><tr><th>备份时间</th><th>备份原因</th><th>操作</th></tr></thead><tbody>';
+    foreach (array_reverse($backups, true) as $id => $backup) {
+        echo '<tr><td>' . esc_html($backup['time']) . '</td><td>' . esc_html($backup['reason']) . '</td><td><button type="button" class="button wuai-csf-history-action" data-operation="restore" data-backup-id="' . esc_attr($id) . '" data-nonce="' . esc_attr($nonce) . '">恢复此备份</button></td></tr>';
+    }
+    echo '</tbody></table>';
+}
+
+add_action('csf_enqueue', function () {
+    $screen = get_current_screen();
+    if (!$screen || substr($screen->id, -10) !== 'wuai-sluyu') {
+        return;
+    }
+    wp_enqueue_style('wuai-csf-zibll', WUAI_SLUYU_URI . '/inc/csf-framework/assets/css/style.css', ['csf'], WUAI_SLUYU_VERSION);
+    wp_enqueue_style('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/css/admin.css', ['wuai-csf-zibll'], WUAI_SLUYU_VERSION);
+    wp_enqueue_script('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/js/admin.js', ['jquery', 'csf'], WUAI_SLUYU_VERSION, true);
+    wp_localize_script('wuai-sluyu-admin', 'wuaiCsf', ['postUrl' => admin_url('admin-post.php')]);
+});
+

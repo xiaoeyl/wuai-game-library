@@ -10,7 +10,8 @@ function wuai_sluyu_github_release() {
     if (!$owner || !$repo) {
         return false;
     }
-    $response = wp_remote_get("https://api.github.com/repos/{$owner}/{$repo}/releases/latest", [
+    $endpoint = ($o['github_channel'] ?? 'stable') === 'beta' ? 'releases?per_page=20' : 'releases/latest';
+    $response = wp_remote_get("https://api.github.com/repos/{$owner}/{$repo}/{$endpoint}", [
         'timeout' => 8,
         'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'Wuai-Sluyu-Theme'],
     ]);
@@ -18,6 +19,15 @@ function wuai_sluyu_github_release() {
         return false;
     }
     $data = json_decode(wp_remote_retrieve_body($response), true);
+    if (($o['github_channel'] ?? 'stable') === 'beta' && is_array($data)) {
+        $releases = array_filter($data, function ($release) {
+            return is_array($release) && empty($release['draft']) && !empty($release['tag_name']);
+        });
+        usort($releases, function ($a, $b) {
+            return version_compare(ltrim($b['tag_name'], 'vV'), ltrim($a['tag_name'], 'vV'));
+        });
+        return $releases ? reset($releases) : false;
+    }
     return is_array($data) && !empty($data['tag_name']) ? $data : false;
 }
 

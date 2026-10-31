@@ -1,87 +1,53 @@
-(function () {
+/* CSF handles tabs, search, save, colors and media. Mobile behavior follows
+ * the menu and sticky-footer handlers in the supplied Zibll settings script. */
+(function ($) {
     'use strict';
-
-    var root = document.querySelector('[data-wuai-admin="1"]');
-    if (!root) {
-        return;
-    }
-
-    var links = root.querySelectorAll('[data-wuai-tab]');
-    var panes = root.querySelectorAll('[data-wuai-pane]');
-    var saveButton = root.querySelector('.wuai-save-button');
-
-    function activate(tab, updateHash) {
-        var target = root.querySelector('[data-wuai-pane="' + tab + '"]');
-        if (!target) {
-            return;
+    $(function () {
+        var $panel = $('.wuai-csf-settings');
+        if (!$panel.length) return;
+        var $nav = $panel.find('.csf-nav-options');
+        function closeMenu() {
+            $nav.removeClass('show');
+            $panel.find('.csf-menu').attr('aria-expanded', 'false');
         }
-        Array.prototype.forEach.call(panes, function (pane) {
-            pane.classList.toggle('is-active', pane === target);
-        });
-        Array.prototype.forEach.call(links, function (link) {
-            var active = link.getAttribute('data-wuai-tab') === tab;
-            link.classList.toggle('is-active', active);
-            var marker = link.querySelector('.dashicons-arrow-right-alt2');
-            if (active && !marker) {
-                var icon = document.createElement('i');
-                icon.className = 'dashicons dashicons-arrow-right-alt2';
-                link.appendChild(icon);
-            } else if (!active && marker) {
-                marker.remove();
-            }
-        });
-        var title = root.querySelector('.wuai-admin-savebar strong');
-        var description = root.querySelector('.wuai-admin-savebar span');
-        var activeLink = root.querySelector('.wuai-admin-nav[data-wuai-tab="' + tab + '"]');
-        if (activeLink) {
-            var text = activeLink.querySelector('strong');
-            var sub = activeLink.querySelector('small');
-            if (title && text) title.textContent = text.textContent;
-            if (description && sub) description.textContent = sub.textContent;
+        function updateSticky() {
+            $panel.find('.csf-container').toggleClass('sticky-sm', $(window).scrollTop() > 300);
         }
-        if (updateHash && window.history && window.history.replaceState) {
-            window.history.replaceState(null, '', '#' + tab);
-        }
-    }
-
-    Array.prototype.forEach.call(links, function (link) {
-        link.addEventListener('click', function (event) {
-            var tab = link.getAttribute('data-wuai-tab');
-            if (!tab) return;
+        $(window).on('scroll.wuaiCsf resize.wuaiCsf', updateSticky);
+        updateSticky();
+        $panel.find('.csf-menu').attr({ role: 'button', 'aria-expanded': 'false', 'aria-label': '切换设置菜单' });
+        $panel.on('click', '.csf-menu', function (event) {
             event.preventDefault();
-            activate(tab, true);
+            $nav.toggleClass('show');
+            $panel.find('.csf-menu').attr('aria-expanded', $nav.hasClass('show') ? 'true' : 'false');
+        });
+        $nav.on('click', 'a', function () {
+            if (window.innerWidth < 783 && !$(this).hasClass('csf-arrow')) closeMenu();
+        });
+        $(document).on('keydown.wuaiCsf', function (event) {
+            if (event.key === 'Escape') closeMenu();
+        }).on('click.wuaiCsf', function (event) {
+            if (!$(event.target).closest('.csf-nav-options, .csf-menu').length) closeMenu();
+        });
+        var touchStart = null;
+        $nav.on('touchstart', function (event) {
+            touchStart = event.originalEvent.touches[0].clientX;
+        }).on('touchend', function (event) {
+            if (touchStart !== null && event.originalEvent.changedTouches[0].clientX - touchStart > 70) closeMenu();
+            touchStart = null;
+        });
+        $panel.on('click', '.wuai-csf-history-action', function () {
+            var button = $(this), operation = button.data('operation');
+            if (operation === 'restore' && !window.confirm('恢复这份配置？当前配置会先自动备份，未保存的表单修改将被放弃。')) return;
+            if (window.CSF && CSF.vars && CSF.vars.form_modified && operation === 'backup' && !window.confirm('只备份已保存的配置，表单中尚未保存的修改不会进入备份。继续吗？')) return;
+            if (window.CSF && CSF.vars) CSF.vars.form_modified = false;
+            var form = $('<form>', { method: 'post', action: wuaiCsf.postUrl });
+            var values = {
+                action: 'wuai_sluyu_settings_history', operation: operation,
+                _wpnonce: button.data('nonce'), backup_id: button.data('backup-id') || ''
+            };
+            $.each(values, function (name, value) { $('<input>', { type: 'hidden', name: name, value: value }).appendTo(form); });
+            form.appendTo('body').trigger('submit');
         });
     });
-
-    var initial = window.location.hash ? window.location.hash.substring(1) : '';
-    if (initial && root.querySelector('[data-wuai-pane="' + initial + '"]')) {
-        activate(initial, false);
-    }
-
-    Array.prototype.forEach.call(root.querySelectorAll('input[type="color"]'), function (input) {
-        var code = input.parentNode.querySelector('code');
-        input.addEventListener('input', function () {
-            if (code) code.textContent = input.value;
-        });
-    });
-
-    Array.prototype.forEach.call(root.querySelectorAll('.wuai-media-button'), function (button) {
-        button.addEventListener('click', function () {
-            if (!window.wp || !wp.media) return;
-            var target = document.getElementById(button.getAttribute('data-wuai-target'));
-            var frame = wp.media({ title: '选择主题媒体', button: { text: '使用此地址' }, multiple: false });
-            frame.on('select', function () {
-                var selection = frame.state().get('selection').first().toJSON();
-                if (target && selection && selection.url) target.value = selection.url;
-            });
-            frame.open();
-        });
-    });
-
-    if (saveButton) {
-        saveButton.addEventListener('click', function () {
-            saveButton.classList.add('is-saving');
-            window.setTimeout(function () { saveButton.classList.remove('is-saving'); }, 900);
-        });
-    }
-}());
+})(jQuery);
