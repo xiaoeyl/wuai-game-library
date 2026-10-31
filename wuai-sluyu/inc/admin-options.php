@@ -346,8 +346,28 @@ function wuai_sluyu_csf_overview() {
 }
 
 function wuai_sluyu_csf_update_info() {
-    echo '<p>当前主题版本：<strong>' . esc_html(WUAI_SLUYU_VERSION) . '</strong>。更新继续通过你自己的 GitHub Releases 发布，由 WordPress 检测并安装。</p>';
-    echo '<p>修改更新源或通道后请先保存，再点击检查更新。</p><a class="button button-primary" href="' . esc_url(admin_url('update-core.php?force-check=1')) . '">手动检查更新</a>';
+    ?>
+    <div class="wuai-update" data-state="idle" aria-busy="false">
+        <div class="wuai-update-card">
+            <div class="wuai-update-heading"><span class="wuai-update-icon fa fa-cloud-download" aria-hidden="true"></span><h3 class="wuai-update-title">主题在线更新</h3></div>
+            <p class="wuai-update-versions">当前主题版本：<strong class="wuai-update-current">V<?php echo esc_html(WUAI_SLUYU_VERSION); ?></strong><span class="wuai-update-latest-wrap" hidden>可更新到：<code class="wuai-update-latest"></code></span></p>
+            <p class="wuai-update-message" role="status" aria-live="polite">正在获取版本信息…</p>
+            <div class="wuai-update-progress-wrap" hidden>
+                <div class="wuai-update-progress" role="progressbar" aria-label="主题更新进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="wuai-update-bar"></div></div>
+                <div class="wuai-update-progress-caption"><span>版本核对 → 下载 → 校验 → 安装 → 完成</span><strong class="wuai-update-percent">0%</strong></div>
+            </div>
+            <div class="wuai-update-buttons">
+                <button type="button" class="but jb-blue wuai-update-install" hidden><i class="fa fa-cloud-download" aria-hidden="true"></i> 在线更新</button>
+                <button type="button" class="but jb-blue wuai-update-check"><i class="fa fa-refresh" aria-hidden="true"></i> 检查更新</button>
+                <button type="button" class="but c-blue wuai-update-reload" hidden>刷新页面</button>
+            </div>
+            <p class="wuai-update-meta"></p>
+        </div>
+        <div class="wuai-update-log" hidden><h4>更新日志 <a class="wuai-update-release" target="_blank" rel="noopener noreferrer">在 GitHub 查看</a></h4><div class="wuai-update-notes"></div></div>
+        <p class="description">更新前自动备份主题设置。修改下方更新源或通道后，请先保存设置，再检查更新。</p>
+        <noscript><p>请启用 JavaScript 使用页内更新，也可在 WordPress“仪表盘 → 更新”中检查版本。</p></noscript>
+    </div>
+    <?php
 }
 
 function wuai_sluyu_csf_history() {
@@ -375,5 +395,7 @@ add_action('csf_enqueue', function () {
     wp_enqueue_style('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/css/admin.css', ['wuai-csf-zibll'], WUAI_SLUYU_VERSION);
     wp_enqueue_script('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/js/admin.js', ['jquery', 'csf'], WUAI_SLUYU_VERSION, true);
     wp_localize_script('wuai-sluyu-admin', 'wuaiCsf', ['postUrl' => admin_url('admin-post.php')]);
+    wp_enqueue_script('wuai-sluyu-updater', WUAI_SLUYU_URI . '/assets/js/admin-updater.js', ['jquery', 'wuai-sluyu-admin'], WUAI_SLUYU_VERSION, true);
+    wp_localize_script('wuai-sluyu-updater', 'wuaiUpdater', ['ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('wuai_sluyu_update')]);
 });
 

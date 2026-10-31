@@ -34,11 +34,13 @@
 发布新的 GitHub Release 时，上传顶层目录为 `wuai-sluyu` 的 ZIP，例如：
 
 ```text
-wuai-sluyu-v1.0.7.zip
+wuai-sluyu-v1.0.8.zip
 ```
 
 后台会通过 GitHub Releases API 检查新版本，不需要在主题中保存 PAT。
-“在线更新”中可手动检查；正式版通道读取最新正式 Release，预发布通道同时检查预发布版本。
+“在线更新”打开时自动检测，点击“检查更新”强制重新查询，无需跳转页面。正式版通道读取最新正式 Release，预发布通道同时检查预发布版本。GitHub 检测结果缓存 1 小时，手动检测绕过缓存。
+
+发现新版本后，当前页显示版本号、Release 更新日志和“在线更新”按钮。点击后先备份主题设置，再由 WordPress 下载、校验并安装主题。彩色进度条显示实际执行阶段（阶段百分比，不是下载字节百分比），刷新页面会恢复进行中的任务。安装权限、重复请求、超时及下载失败均有提示；仅接受所配置仓库的主题 ZIP，不使用整个仓库的自动源码压缩包。ZIP 的目录、必需文件、版本、PHP/WordPress 要求以及 GitHub 提供的 SHA256 都会校验。WordPress 6.3+ 使用内置临时备份恢复失败的安装。
 
 ## 参考素材
 
@@ -79,3 +81,12 @@ wuai-sluyu-v1.0.7.zip
 - 文章、作者数量和评论使用站点真实数据。会员付费、优惠券、私信和圈子业务需配置已提供这些能力的页面或插件；此次没有导入参考站的用户、文章或虚构权益。
 
 `node tests/frontend-layout.cjs` 在隔离 WordPress 测试站验证页面结构、导航工具、下载、移动端、签到、喜欢和受保护文章；测试数据仅保存在本地。
+
+## v1.0.8
+
+- 主题设置的“检查更新”改为子比风格的页内卡片，展示自动/手动检测结果、当前/最新版本、检测时间和 GitHub 更新日志。
+- 新增一键在线更新、彩色阶段进度、完成提示、刷新恢复进度，以及网络/权限/无 Release 等错误提示。
+- 安装使用 WordPress 原生 Theme_Upgrader；更新前备份设置，校验主题包目录、版本、文件及兼容要求，支持 GitHub SHA256 校验，并发锁防止重复安装。
+- 保留 WordPress 原生更新通知与 GitHub 正式版/预发布通道；服务器连接失败不会被显示为“已是最新版”。
+
+`python tests/prepare-updater.py` prepares a disposable local WordPress fixture for `node tests/updater.cjs`. Never deploy the fixture plugin. `WP_QA_SOURCE` selects an isolated release source; `WP_QA_POLL_URL` can point to a second local PHP worker to verify concurrent progress polling and refresh recovery.

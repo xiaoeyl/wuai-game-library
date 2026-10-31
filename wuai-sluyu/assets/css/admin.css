@@ -5,7 +5,45 @@
 .wuai-csf-settings .widefat { max-width: 900px; }
 .wuai-csf-settings .csf-field-number input { width: 140px; }
 .wuai-csf-settings .csf-field-upload input { max-width: 100%; }
+.wuai-update { max-width: 1100px; }
+.wuai-update [hidden] { display: none !important; }
+.wuai-update-card { padding: 22px 26px; border-radius: 8px; background: #fff; border: 1px solid #e7edf5; border-left: 4px solid #54b5f7; box-shadow: 0 3px 15px #66789708; }
+.wuai-update-heading { display: flex; align-items: center; gap: 12px; }
+.wuai-update-heading h3 { margin: 0; font-size: 18px; color: #409eff; }
+.wuai-update-icon { font-size: 30px; color: #ff548e; }
+.wuai-update-versions { line-height: 2; }
+.wuai-update-latest-wrap { display: inline-block; margin-left: 24px; }
+.wuai-update-latest { margin-left: 8px; font-size: 16px; color: #f34c6e; background: #fff0f3; border-radius: 4px; }
+.wuai-update-message { color: #68758a; overflow-wrap: anywhere; min-height: 20px; }
+.wuai-update-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 10px; }
+.wuai-update-buttons .but { cursor: pointer; padding: 8px 20px; border: 0; border-radius: 4px; line-height: 1.7; font-size: 13px; }
+.wuai-update-buttons .jb-blue { color: #fff; background: linear-gradient(135deg, #59c2fb, #428bea); box-shadow: 0 3px 9px #499df329; }
+.wuai-update-buttons .c-blue { color: #428bea; background: #eaf5ff; }
+.wuai-update-buttons .but:disabled { opacity: .55; cursor: wait; }
+.wuai-update-buttons .but:focus-visible { outline: 2px solid #7e6adc; outline-offset: 3px; }
+.wuai-update-meta { font-size: 12px; color: #939aa8; margin: 12px 0 0; }
+.wuai-update-log { margin-top: 22px; padding: 18px 24px; background: #fff; border: 1px solid #e7edf5; border-radius: 8px; }
+.wuai-update-log h4 { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; font-size: 14px; }
+.wuai-update-log a { font-size: 12px; font-weight: normal; }
+.wuai-update-notes { overflow-wrap: anywhere; line-height: 1.9; color: #68758a; max-height: 420px; overflow-y: auto; }
+.wuai-update-notes h5 { margin: 12px 0; font-size: 14px; color: #4d5a70; }
+.wuai-update-notes ul { padding-left: 20px; list-style: disc; }
+.wuai-update-notes p { white-space: pre-wrap; }
+.wuai-update-progress-wrap { margin-top: 20px; }
+.wuai-update-progress { height: 12px; border-radius: 20px; background: #eef0f7; overflow: hidden; }
+.wuai-update-bar { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(110deg, #50c9f5, #7b79f6 45%, #ed76b6 80%, #ffb778); transition: width .5s ease; position: relative; }
+.wuai-update-bar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, #fff0, #fff0 10px, #fff3 10px, #fff3 20px); background-size: 28px 28px; animation: wuai-update-flow 1s linear infinite; }
+.wuai-update-progress-caption { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; color: #8994a6; font-size: 12px; }
+.wuai-update[data-state="current"] h3, .wuai-update[data-state="complete"] h3 { color: #27ae86; }
+.wuai-update[data-state="current"] .wuai-update-icon, .wuai-update[data-state="complete"] .wuai-update-icon { color: #27ae86; }
+.wuai-update[data-state="available"] h3, .wuai-update[data-state="error"] h3 { color: #f05287; }
+.wuai-update[data-state="error"] .wuai-update-card { border-left-color: #f05287; }
+.wuai-update[data-state="error"] .wuai-update-bar::after, .wuai-update[data-state="complete"] .wuai-update-bar::after { animation: none; }
+@keyframes wuai-update-flow { to { background-position: 28px 0; } }
+@media (prefers-reduced-motion: reduce) { .wuai-update-bar { transition: none; } .wuai-update-bar::after { animation: none; } }
 @media (max-width: 782px) {
+    .wuai-update-card, .wuai-update-log { padding: 16px; }
+    .wuai-update-latest-wrap { display: block; margin-left: 0; }
     .wuai-csf-settings { margin-bottom: 80px; }
     .wuai-csf-settings .csf-copyright { display: none; }
     .wuai-csf-settings .csf-footer .csf-buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
