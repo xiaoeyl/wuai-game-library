@@ -65,6 +65,9 @@ function wuai_sluyu_account_submission_permission($post, $uid, $operation) {
     if (!in_array($post->post_status, ['publish','pending','draft'], true)) {
         return new WP_Error('submission_state', '此稿件当前由管理员管理，请联系管理员处理。');
     }
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post->ID)) {
+        return new WP_Error('submission_review_held', '此话题的审核尚未完成，请联系站点编辑核验后再修改、撤回或删除。');
+    }
     if (in_array($post->post_type, ['sluyu_verify','sluyu_ticket'], true) && ($post->post_status === 'publish' || get_post_meta($post->ID, '_wuai_ticket_reply', true))) {
         return new WP_Error('submission_processed', '已处理的申请和工单为只读记录，请另行提交补充说明。');
     }

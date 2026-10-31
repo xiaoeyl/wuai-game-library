@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WUAI_SLUYU_VERSION', '1.3.0');
+define('WUAI_SLUYU_VERSION', '1.4.0');
 define('WUAI_SLUYU_DIR', get_stylesheet_directory());
 define('WUAI_SLUYU_URI', get_stylesheet_directory_uri());
 
@@ -23,6 +23,8 @@ require_once WUAI_SLUYU_DIR . '/inc/profile-media.php';
 require_once WUAI_SLUYU_DIR . '/inc/protected-content.php';
 require_once WUAI_SLUYU_DIR . '/inc/listings.php';
 require_once WUAI_SLUYU_DIR . '/inc/downloads.php';
+require_once WUAI_SLUYU_DIR . '/inc/guess-answer.php';
+require_once WUAI_SLUYU_DIR . '/inc/circle-moderation.php';
 require_once WUAI_SLUYU_DIR . '/inc/invitations.php';
 require_once WUAI_SLUYU_DIR . '/inc/membership-state.php';
 require_once WUAI_SLUYU_DIR . '/inc/portal-views.php';

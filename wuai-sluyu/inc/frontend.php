@@ -71,19 +71,25 @@ function wuai_sluyu_frontend_action() {
     }
     if ($operation === 'like') {
         $post_id = absint(wuai_sluyu_input('post_id'));
-        $post = get_post($post_id);
+        $post = wuai_sluyu_public_post($post_id);
         if (!$post || !in_array($post->post_type, ['post','sluyu_topic','sluyu_news','sluyu_link','sluyu_listing'], true) || $post->post_status !== 'publish' || post_password_required($post)) {
             wp_send_json_error(['message' => '这篇文章暂时无法操作。'], 403);
         }
         $key = '_wuai_sluyu_like_' . $post_id;
         $lock=wuai_sluyu_lock('user_'.$user_id);
         if(!$lock) { wp_send_json_error(['message'=>'上一项操作正在处理，请稍后重试。'],429); }
+        $available=false;
         try {
+            clean_post_cache($post_id);
+            $available=(bool)wuai_sluyu_public_post($post_id);
+            if ($available) {
             wp_cache_delete($user_id,'user_meta');
             $liked = get_user_meta($user_id, $key, true) !== '1';
             if ($liked) { update_user_meta($user_id, $key, '1'); }
             else { delete_user_meta($user_id, $key); }
+            }
         } finally { wuai_sluyu_unlock($lock); }
+        if (!$available) { wp_send_json_error(['message'=>'内容状态已变化，暂不能操作。'],403); }
         wp_send_json_success(['liked' => $liked, 'count' => wuai_sluyu_like_count($post_id), 'message' => $liked ? '感谢你的喜欢' : '已取消喜欢']);
     }
     wp_send_json_error(['message' => '无效的操作。'], 400);
@@ -102,6 +108,7 @@ add_action('template_redirect', function () {
 });
 
 function wuai_sluyu_download_card($post_id, $compact = false, $instance_id = '') {
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return; }
     $options = wuai_sluyu_get_options();
     $url = wuai_sluyu_post_meta($post_id, 'download_url');
     if (!$url || $options['show_resource_box'] !== '1' || post_password_required($post_id)) {
@@ -131,6 +138,7 @@ function wuai_sluyu_download_card($post_id, $compact = false, $instance_id = '')
 }
 
 function wuai_sluyu_comment($comment, $args, $depth) {
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($comment->comment_post_ID)) { return; }
     ?>
     <li <?php comment_class('sluyu-comment-item'); ?> id="comment-<?php comment_ID(); ?>">
         <div class="sluyu-comment-body" id="div-comment-<?php comment_ID(); ?>">

@@ -24,7 +24,7 @@ function wuai_sluyu_portal_pagination($total, $key, $page_key = 'pg', $extra = [
 }
 
 function wuai_sluyu_render_portal($key) {
-    $handlers = ['account'=>'account_extended','mission'=>'mission','task'=>'task','gold'=>'gold','directmessage'=>'messages_extended','message'=>'messages_extended','verify'=>'verify','dark-room'=>'bans','submit'=>'submit','tools'=>'tools','document'=>'documents','more'=>'directory','circle'=>'feed','circles'=>'circles','listings'=>'listings','invitations'=>'invitations','newsflashes'=>'feed','links'=>'feed'];
+    $handlers = ['account'=>'account_extended','mission'=>'mission','task'=>'task','gold'=>'gold','directmessage'=>'messages_extended','message'=>'messages_extended','verify'=>'verify','dark-room'=>'bans','submit'=>'submit','tools'=>'tools','document'=>'documents','more'=>'directory','circle'=>'feed','circles'=>'circles','circle-topics'=>'circle_topics','listings'=>'listings','invitations'=>'invitations','newsflashes'=>'feed','links'=>'feed'];
     if (isset($handlers[$key])) { call_user_func('wuai_sluyu_view_' . $handlers[$key], $key); }
     elseif (in_array($key,['shop','carts','orders','coupons','vips'],true)) { wuai_sluyu_view_commerce($key); }
     elseif (isset(wuai_sluyu_portal_pages()[$key])) { wuai_sluyu_view_information($key); }
@@ -108,6 +108,7 @@ function wuai_sluyu_view_bans() {
 function wuai_sluyu_view_submit() {
     if(!wuai_sluyu_require_login())return;
     if(wuai_sluyu_query('kind')==='listing') { wuai_sluyu_view_listing_submit(); return; }
+    if(wuai_sluyu_query('kind')==='guess') { wuai_sluyu_view_guess_submit(); return; }
     $requested_group=wuai_sluyu_query('group','0');
     $invalid_group=(isset($_GET['group']) && !is_scalar($_GET['group'])) || (!isset($_GET['group']) && isset($_GET['circle_id']) && !is_scalar($_GET['circle_id']));
     if ($invalid_group || !preg_match('/^(?:0|[1-9][0-9]{0,9})$/D',$requested_group) || ((int)$requested_group && !wuai_sluyu_circle_can_post((int)$requested_group,get_current_user_id()))) {
@@ -116,6 +117,7 @@ function wuai_sluyu_view_submit() {
     }
     echo '<section class="sluyu-panel"><h2>每一份分享，都值得认真对待</h2><p>发布内容需经管理员审核。请确认拥有分享权限，不发布个人隐私、侵权或违法内容。</p>';
     echo '<p><a href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>'listing'])) . '">发布供求信息 →</a></p>';
+    echo '<p><a href="'.esc_url(wuai_sluyu_portal_url('submit',['kind'=>'guess','group'=>(int)$requested_group])).'">发布猜答案互动题 →</a></p>';
     wuai_sluyu_form_start('submit'); $selected=sanitize_key(wuai_sluyu_query('kind','topic'));
     echo '<label>发布类型<select name="kind">';
     foreach(['topic'=>'日常话题','question'=>'提问','poll'=>'投票','post'=>'文章投稿','news'=>'快讯爆料','link'=>'网址入驻','ticket'=>'工单 / 资源反馈'] as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected($value,$selected,false) . '>' . esc_html($label) . '</option>'; }
@@ -149,11 +151,20 @@ function wuai_sluyu_view_feed($key) {
     echo '</div><div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url($key)) . '">全部</a>';
     if($key==='circle')echo '<a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">圈子广场 / 创建圈子</a>';
     $terms=get_terms(['taxonomy'=>$config[1],'hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['group'=>$term->term_id])) . '">' . esc_html($term->name) . '</a>';
-    if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value,'group'=>$group])) . '">' . $label . '</a>';
-    echo '</div></section>';
+    if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票','guess'=>'猜答案'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value,'group'=>$group])) . '">' . $label . '</a>';
+    echo '</div>';
+    if($key==='circle') {
+        $sort=wuai_sluyu_query('sort','latest');
+        echo '<form class="sluyu-filter-form" method="get" action="'.esc_url(wuai_sluyu_portal_url('circle')).'">';
+        if(!get_option('permalink_structure'))echo '<input type="hidden" name="sluyu_page" value="circle">';
+        echo '<input type="hidden" name="group" value="'.$group.'"><input type="hidden" name="kind" value="'.esc_attr($kind).'"><label>话题排序<select name="sort">';
+        foreach(['latest'=>'最新发布','featured'=>'圈内精选','likes'=>'最多喜欢','comments'=>'最多讨论'] as $value=>$label)echo '<option value="'.$value.'" '.selected($sort,$value,false).'>'.esc_html($label).'</option>';
+        echo '</select></label><button class="sluyu-action-plain">筛选</button></form>';
+    }
+    echo '</section>';
     $args=['post_type'=>$config[0],'post_status'=>'publish','has_password'=>false,'posts_per_page'=>12,'paged'=>$page];
     if($group)$args['tax_query']=[['taxonomy'=>$config[1],'terms'=>$group]];
-    if($key==='circle' && in_array($kind,['topic','question','poll'],true)) { $args['meta_key']='_wuai_topic_kind'; $args['meta_value']=$kind; }
+    if($key==='circle') { $args=wuai_sluyu_circle_feed_query_args($group,$kind,$sort,$page); }
     $query=new WP_Query($args);
     echo '<div class="' . ($key==='links'?'sluyu-service-grid':'sluyu-feed') . '">';
     while($query->have_posts()) { $query->the_post(); $id=get_the_ID(); $source=get_post_meta($id,'_wuai_source_url',true);
@@ -161,6 +172,7 @@ function wuai_sluyu_view_feed($key) {
         if($key==='links' && $source)echo '<a class="sluyu-action-plain" href="' . esc_url($source) . '" rel="nofollow noopener noreferrer" target="_blank">访问网站 ↗</a>';
         if($key==='circle')echo '<a class="sluyu-action-plain" href="' . esc_url(get_permalink()) . '">参与讨论 · ' . get_comments_number() . '</a>';
         if($key==='newsflashes') { wuai_sluyu_action_button('news_vote','赞同',['id'=>$id,'direction'=>'up']); echo ' '; wuai_sluyu_action_button('news_vote','不赞同',['id'=>$id,'direction'=>'down']); }
+        if($key==='circle' && $group)wuai_sluyu_circle_review_feature_form($id,$group);
         echo '</article>';
     } echo '</div>'; if(!$query->post_count)wuai_sluyu_empty(); wp_reset_postdata(); wuai_sluyu_portal_pagination($query->max_num_pages,$key);
 }

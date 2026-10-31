@@ -9,6 +9,7 @@ function wuai_sluyu_portal_pages() {
         'gold' => ['财富管理', '积分明细与账户记录', 'coin-line'],
         'circle' => ['茶话会', '分享日常，交流问题，一起投票', 'chat-smile-2-line'],
         'circles' => ['圈子广场', '寻找同好，加入或创建你的茶话会', 'chat-heart-line'],
+        'circle-topics' => ['圈主话题审核', '审核意见、退回修改与发布进度', 'shield-user-line'],
         'listings' => ['供求广场', '审核制供求信息与站内联系', 'megaphone-line'],
         'invitations' => ['我的邀请码', '一次性邀请，共同维护友善社区', 'mail-send-line'],
         'newsflashes' => ['解忧资讯', '发现新鲜事，分享值得关注的消息', 'notification-3-line'],

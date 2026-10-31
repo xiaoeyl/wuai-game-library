@@ -26,7 +26,7 @@ try {
     $subscriber = $users['subscriber']; $author = $users['author']; $editor = $users['editor'];
     foreach (wuai_sluyu_service_post_types() as $type) {
         $obj = get_post_type_object($type);
-        perm_check($obj->cap->create_posts === 'wuai_manage_service_content' && $obj->cap->publish_posts === 'wuai_manage_service_content', 'Service registration isolates native write capabilities: ' . $type);
+        perm_check($obj->cap->create_posts === 'wuai_manage_service_content' && $obj->cap->publish_posts === ($type==='sluyu_topic'?'wuai_publish_circle_topics':'wuai_manage_service_content'), 'Service registration isolates native write capabilities: ' . $type);
         $id = wp_insert_post(['post_type'=>$type,'post_status'=>'publish','post_author'=>$author,'post_title'=>'QA native ' . $type,'post_content'=>'Published service fixture.','comment_status'=>'open'], true);
         perm_check(!is_wp_error($id), 'Create service fixture.'); $posts[] = (int) $id; $service[$type] = (int) $id;
         wp_set_current_user($author);

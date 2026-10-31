@@ -50,6 +50,7 @@ function wuai_sluyu_image($post_id = 0, $size = 'wuai-sluyu-card') {
 
 function wuai_sluyu_excerpt($post_id = 0) {
     $post_id = $post_id ?: get_the_ID();
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return ''; }
     $excerpt = get_the_excerpt($post_id);
     if (!$excerpt) {
         $excerpt = get_post_field('post_content', $post_id);
@@ -92,6 +93,7 @@ function wuai_sluyu_section_categories() {
 }
 
 function wuai_sluyu_render_card($post_id = 0, $style = 'standard') {
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id ?: get_the_ID())) { return; }
     $post_id = $post_id ?: get_the_ID();
     $cats = get_the_category($post_id);
     $cat = $cats ? $cats[0] : null;

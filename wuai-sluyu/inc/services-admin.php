@@ -19,7 +19,11 @@ add_action('add_meta_boxes',function(){
 function wuai_sluyu_service_meta($post) {
     wp_nonce_field('wuai_service_meta','wuai_service_meta_nonce');
     if(in_array($post->post_type,['sluyu_news','sluyu_link'],true))echo '<p><label>来源 / 站点网址 <input class="widefat" type="url" name="wuai_source_url" value="' . esc_attr(get_post_meta($post->ID,'_wuai_source_url',true)) . '"></label></p>';
-    if($post->post_type==='sluyu_topic') { echo '<p><label>话题类型 <select name="wuai_topic_kind">'; foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票'] as $value=>$label)echo '<option value="' . $value . '" ' . selected(get_post_meta($post->ID,'_wuai_topic_kind',true),$value,false) . '>' . $label . '</option>'; echo '</select></label></p><p>投票创建后不可更改选项，避免已投票的数据发生错配。</p><label>投票选项（仅新投票填写，每行一项）<textarea class="widefat" name="wuai_poll_choices" rows="5">' . esc_textarea(implode("\n",(array)get_post_meta($post->ID,'_wuai_poll_choices',true))) . '</textarea></label>'; }
+    if($post->post_type==='sluyu_topic') {
+        $current_kind=get_post_meta($post->ID,'_wuai_topic_kind',true);
+        $types=$current_kind==='guess'?['guess'=>'猜答案（类型锁定）']:['topic'=>'日常','question'=>'提问','poll'=>'投票'];
+        echo '<p><label>话题类型 <select name="wuai_topic_kind">'; foreach($types as $value=>$label)echo '<option value="' . $value . '" ' . selected($current_kind,$value,false) . '>' . esc_html($label) . '</option>'; echo '</select></label></p><p>猜答案仅从专用前台表单创建；已有或曾有猜题配置的稿件不能通过此表单转换题型。投票创建后不可更改选项，避免已投票的数据发生错配。</p><label>投票选项（仅新投票填写，每行一项）<textarea class="widefat" name="wuai_poll_choices" rows="5">' . esc_textarea(implode("\n",(array)get_post_meta($post->ID,'_wuai_poll_choices',true))) . '</textarea></label>';
+    }
     if($post->post_type==='sluyu_topic') { wuai_sluyu_poll_admin_fields($post->ID); }
     if($post->post_type==='sluyu_ticket')echo '<label>处理结果（保存后发送给提交者）<textarea class="widefat" name="wuai_ticket_reply" rows="5">' . esc_textarea(get_post_meta($post->ID,'_wuai_ticket_reply',true)) . '</textarea></label>';
 }
@@ -30,7 +34,7 @@ add_action('save_post',function($id){
     if($lock) {
         try {
             $tally=wuai_sluyu_poll_tally($id); $has_votes=$tally['voters']>0;
-            if(isset($_POST['wuai_topic_kind']) && !$has_votes) { $kind=wuai_sluyu_input('wuai_topic_kind'); if(in_array($kind,['topic','question','poll'],true))update_post_meta($id,'_wuai_topic_kind',$kind); }
+            if(isset($_POST['wuai_topic_kind']) && !$has_votes && get_post_type($id)==='sluyu_topic' && get_post_meta($id,'_wuai_topic_kind',true)!=='guess' && !metadata_exists('post',$id,'_wuai_guess_config')) { $kind=wuai_sluyu_input('wuai_topic_kind'); if(in_array($kind,['topic','question','poll'],true))update_post_meta($id,'_wuai_topic_kind',$kind); }
             if(isset($_POST['wuai_poll_choices']) && !get_post_meta($id,'_wuai_poll_choices',true)) { $choices=array_values(array_unique(array_filter(array_map('sanitize_text_field',explode("\n",wuai_sluyu_input('wuai_poll_choices',true))),'strlen'))); if(count($choices)>=2 && count($choices)<=8 && max(array_map('mb_strlen',$choices))<=100)update_post_meta($id,'_wuai_poll_choices',$choices); }
             $choices=(array)get_post_meta($id,'_wuai_poll_choices',true); $mode=wuai_sluyu_input('wuai_poll_mode');
             if(!$has_votes && in_array($mode,['single','multiple','pk'],true) && ($mode!=='pk' || count($choices)===2)) { update_post_meta($id,'_wuai_poll_mode',$mode); update_post_meta($id,'_wuai_poll_max',$mode==='multiple'?max(1,min(count($choices),absint(wuai_sluyu_input('wuai_poll_max')))):1); }

@@ -11,7 +11,7 @@ function wuai_sluyu_download_config($post_id) {
     $bundle=is_array($saved);
     $url=$bundle?($saved['url']??''):wuai_sluyu_post_meta($post_id,'download_url');
     $access=$bundle?($saved['access']??''):wuai_sluyu_post_meta($post_id,'download_access','public');
-    if (!is_string($url) || !is_string($access) || !isset(wuai_sluyu_download_modes()[$access])) { return false; }
+    if (!is_string($url) || !preg_match('~^https?://~i',$url) || !is_string($access) || !isset(wuai_sluyu_download_modes()[$access])) { return false; }
     $url=esc_url_raw($url,['http','https']); $parts=wp_parse_url($url);
     if (!$url || !$parts || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) { return false; }
     $raw_cost=$bundle?$saved['cost']:wuai_sluyu_post_meta($post_id,'download_cost',0);
@@ -38,6 +38,7 @@ function wuai_sluyu_download_entitlement($post_id,$uid,$config) {
 }
 
 function wuai_sluyu_download_access($post_id,$uid=null) {
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return false; }
     $uid=$uid===null?get_current_user_id():absint($uid);
     $post=get_post($post_id); $config=wuai_sluyu_download_config($post_id);
     if (!$post || !$config || $post->post_status!=='publish' || post_password_required($post) || ($uid && (!get_userdata($uid) || wuai_sluyu_banned($uid)))) { return false; }
@@ -56,6 +57,7 @@ function wuai_sluyu_download_access($post_id,$uid=null) {
 }
 
 function wuai_sluyu_download_quote($post_id) {
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return ''; }
     $config=wuai_sluyu_download_config($post_id); $post=get_post($post_id); $uid=get_current_user_id();
     if (!$uid || !$config || !$post || $config['access']!=='points' || $post->post_status!=='publish' || post_password_required($post) || wuai_sluyu_banned($uid)) { return ''; }
     return hash_hmac('sha256',wp_json_encode([$uid,$post_id,$post->post_title,$config]),wp_salt('nonce'));
@@ -70,6 +72,7 @@ function wuai_sluyu_download_unlock($post_id,$quote,$confirmed,$user_locked=fals
         $post_lock=wuai_sluyu_protected_post_lock($post_id);
         if (!$post_lock) { return new WP_Error('download_busy','资源正在更新，请刷新后重试。'); }
         clean_post_cache($post_id); wp_cache_delete($uid,'user_meta');
+        if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return new WP_Error('download_held','内容正在核验，不会扣除积分。'); }
         $post=get_post($post_id); $config=wuai_sluyu_download_config($post_id);
         if (!$post || !$config || $config['access']!=='points' || $post->post_status!=='publish' || post_password_required($post) || wuai_sluyu_banned($uid)) { return new WP_Error('download_unavailable','资源当前无法解锁，不会扣除积分。'); }
         if (wuai_sluyu_download_access($post_id)) { return ['message'=>'已具有下载权限，不会重复扣分。','charged'=>0,'reload'=>true]; }

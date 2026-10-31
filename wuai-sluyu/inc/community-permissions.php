@@ -18,6 +18,7 @@ add_filter('register_post_type_args', function ($args, $post_type) {
     if (!in_array($post_type, wuai_sluyu_service_post_types(), true)) { return $args; }
     $args['map_meta_cap'] = true;
     $args['capabilities'] = array_merge((array) ($args['capabilities'] ?? []), wuai_sluyu_service_capabilities());
+    if($post_type==='sluyu_topic')$args['capabilities']['publish_posts']='wuai_publish_circle_topics';
     return $args;
 }, 20, 2);
 
@@ -28,11 +29,12 @@ add_filter('map_meta_cap', function ($caps, $cap, $uid, $args) {
         'delete_posts','delete_others_posts','delete_published_posts','delete_private_posts',
         'edit_pages','edit_others_pages','edit_published_pages','edit_private_pages','publish_pages',
         'delete_pages','delete_others_pages','delete_published_pages','delete_private_pages','upload_files',
-        'wuai_manage_service_content',
+        'wuai_manage_service_content','wuai_publish_circle_topics',
         'manage_categories','edit_terms','delete_terms','assign_terms','edit_term','delete_term','assign_term',
     ];
     if ($uid && in_array($cap, $write_caps, true) && wuai_sluyu_banned($uid)) { return ['do_not_allow']; }
     if ($cap === 'wuai_manage_service_content') { return ['edit_others_posts']; }
+    if ($cap === 'wuai_publish_circle_topics') { return ['edit_others_posts','publish_posts','manage_categories']; }
     if (in_array($cap, ['edit_post','edit_page','delete_post','delete_page'], true) && !empty($args[0]) && is_scalar($args[0])) {
         $post = get_post(absint($args[0]));
         if ($post && $post->post_type === 'revision') { $post = get_post($post->post_parent); }
@@ -55,6 +57,7 @@ function wuai_sluyu_comment_permission($comment, $uid = null) {
         $post_id = $existing ? (int) $existing->comment_post_ID : 0;
     }
     if (!$post_id || get_post_type($post_id) !== 'sluyu_topic') { return true; }
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return new WP_Error('wuai_comment_held', '话题正在核验，暂不能参与评论。', ['status'=>403]); }
     $groups = wp_get_object_terms($post_id, 'sluyu_circle', ['fields'=>'ids','wuai_include_pending'=>true]);
     if (is_wp_error($groups)) { return new WP_Error('wuai_comment_circle', '无法核验圈子权限，请稍后再试。', ['status'=>403]); }
     foreach ($groups as $group) {

@@ -68,6 +68,7 @@ function wuai_sluyu_circle_can_post($id, $uid) {
 
 function wuai_sluyu_circle_topic_participation($post_id, $uid = null) {
     if (get_post_type($post_id) !== 'sluyu_topic') { return new WP_Error('circle_topic', '话题不存在。'); }
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return new WP_Error('circle_topic_held', '话题正在核验，暂不能参与。'); }
     $groups = wp_get_object_terms($post_id, 'sluyu_circle', ['fields'=>'ids','wuai_include_pending'=>true]);
     if (is_wp_error($groups)) { return new WP_Error('circle_groups', '无法核验所属圈子，请稍后重试。'); }
     return wuai_sluyu_circle_participation($groups, $uid);
@@ -199,6 +200,7 @@ function wuai_sluyu_circle_header($id) {
     elseif ($state==='blocked') { echo '<span class="sluyu-state-pill">加入受限</span>'; }
     else { echo '<span class="sluyu-state-pill">圈子管理者</span>'; }
     if ($participation === true) { echo '<a class="sluyu-action-plain" href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>'topic','group'=>$id])) . '">发布话题</a>'; }
+    if (wuai_sluyu_circle_review_can_manage($id,$uid)) { echo '<a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('circle-topics',['group'=>$id])).'">话题审核</a>'; }
     echo '<a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">全部圈子 →</a></div>';
     if ($uid && is_wp_error($participation)) { echo '<p class="sluyu-muted">' . esc_html($participation->get_error_message()) . '</p>'; }
     echo '</section>';

@@ -59,6 +59,8 @@ try {
     wp_set_current_user($editor); protected_check(current_user_can('edit_post_meta', $author_post, wuai_sluyu_protected_key()), 'Trusted editor may manage protected meta.');
     $config = wuai_sluyu_protected_config($login);
     protected_check(strpos($config['body'], '<script') === false && strpos($config['body'], '<img') === false && strpos($config['body'], 'javascript:') === false && strpos($config['body'], '[qa_protected_probe]') === false, 'Only safe basic HTML persists; shortcode brackets inert.');
+    protected_check(wuai_sluyu_protected_html($config['body']) === $config['body'], 'Canonical shortcode escaping is stable across repeated sanitization.');
+    protected_check(wuai_sluyu_protected_html('&#91;qa_protected_probe&#93;') === '&#091;qa_protected_probe&#093;', 'Legacy bracket entities normalize to the same inert representation.');
     protected_check(!wuai_sluyu_protected_state($login, 0)['allowed'] && wuai_sluyu_protected_state($login, $reader)['allowed'], 'Login gate requires a real logged-in account.');
     protected_check(!wuai_sluyu_protected_state($member, $reader)['allowed'], 'Ordinary reader cannot access member fragment.');
     update_user_meta($reader, '_wuai_member_until', time() + HOUR_IN_SECONDS);

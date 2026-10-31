@@ -25,7 +25,7 @@ function wuai_sluyu_protected_html($value) {
     $value = preg_replace('/<!--[\s\S]*?-->/', '', $value);
     $value = wp_kses($value, $allowed, ['http','https']);
     // Appending after the normal content filters must never make shortcodes executable.
-    return str_replace(['[', ']'], ['&#91;', '&#93;'], $value);
+    return str_replace(['[', ']'], ['&#091;', '&#093;'], $value);
 }
 
 function wuai_sluyu_protected_config($post_id) {
@@ -76,6 +76,7 @@ function wuai_sluyu_protected_state($post_id, $uid = null, $allow_preview = fals
     $uid = $uid === null ? get_current_user_id() : absint($uid);
     $post = get_post($post_id); $config = wuai_sluyu_protected_config($post_id);
     $state = ['enabled'=>(bool) $config,'allowed'=>false,'reason'=>'unavailable','access'=>'','cost'=>0,'purchased'=>false,'preview'=>false];
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return $state; }
     if (!$post || !$config || !wuai_sluyu_protected_supported($post)) { return $state; }
     $state['access'] = $config['access']; $state['cost'] = $config['cost'];
     if ($post->post_password !== '' || ($uid && (!get_userdata($uid) || wuai_sluyu_banned($uid)))) { return $state; }
@@ -101,6 +102,7 @@ function wuai_sluyu_protected_state($post_id, $uid = null, $allow_preview = fals
 }
 
 function wuai_sluyu_protected_quote($post_id, $uid = null) {
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return ''; }
     $uid = $uid === null ? get_current_user_id() : absint($uid);
     $post = get_post($post_id); $config = wuai_sluyu_protected_config($post_id);
     if (!$uid || $uid !== get_current_user_id() || !$post || !$config || $config['access'] !== 'points' || $post->post_status !== 'publish' || $post->post_password !== '' || !wuai_sluyu_protected_supported($post) || wuai_sluyu_banned($uid)) { return ''; }
@@ -126,6 +128,7 @@ function wuai_sluyu_protected_unlock($post_id, $quote, $confirmed, $user_locked 
         clean_user_cache($uid);
         if (!get_userdata($uid) || wuai_sluyu_banned($uid)) { return new WP_Error('protected_auth', '账户状态已变化，本次不会扣分。'); }
         clean_post_cache($post_id);
+        if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post_id)) { return new WP_Error('protected_held','内容正在核验，不会扣除积分。'); }
         $post = get_post($post_id); $config = wuai_sluyu_protected_config($post_id);
         if (!$post || !$config || !wuai_sluyu_protected_supported($post) || $post->post_status !== 'publish' || $post->post_password !== '' || $config['access'] !== 'points') { return new WP_Error('protected_unavailable', '此内容当前不能用积分解锁，不会扣除积分。'); }
         $state = wuai_sluyu_protected_state($post_id, $uid);

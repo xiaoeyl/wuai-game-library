@@ -125,6 +125,7 @@ function wuai_sluyu_member($user_id = 0) {
 }
 function wuai_sluyu_public_post($id, $types = ['post','sluyu_topic','sluyu_news','sluyu_link','sluyu_listing']) {
     $post = get_post($id);
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($id)) { return false; }
     return $post && in_array($post->post_type, $types, true) && $post->post_status === 'publish' && !post_password_required($post) ? $post : false;
 }
 function wuai_sluyu_input($key, $textarea = false) {
@@ -302,6 +303,8 @@ add_filter('preprocess_comment', function ($comment) {
     return $comment;
 });
 add_action('transition_post_status', function ($new, $old, $post) {
+    if (!empty($GLOBALS['wuai_sluyu_circle_review_transition'][$post->ID])) { return; }
+    if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post->ID)) { return; }
     if ($new === $old || !in_array($post->post_type, ['sluyu_topic','sluyu_news','sluyu_link','sluyu_verify','sluyu_ticket'],true)) { return; }
     if ($new === 'publish') {
         if ($post->post_type === 'sluyu_verify') { update_user_meta($post->post_author, '_wuai_verified_title', sanitize_text_field($post->post_title)); }

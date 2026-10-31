@@ -1,4 +1,4 @@
-<?php if (post_password_required() || (!comments_open() && !get_comments_number())) return; ?>
+<?php if (post_password_required() || (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held(get_the_ID())) || (!comments_open() && !get_comments_number())) return; ?>
 <section class="sluyu-comments sluyu-comments-reference" id="comments">
     <h2>评论 <span><?php echo esc_html(get_comments_number()); ?> 条</span></h2>
     <?php if (comments_open()) : comment_form([
