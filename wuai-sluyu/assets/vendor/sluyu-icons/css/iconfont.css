@@ -1,0 +1,731 @@
+﻿@font-face {
+  font-family: "b2font"; /* Project id 2579934 */
+  src: url('../font/iconfont.woff2') format('woff2'),
+       url('../font/iconfont.woff') format('woff'),
+       url('../font/iconfont.ttf') format('truetype');
+}
+
+.b2font {
+  font-family: "b2font" !important;
+  font-size: 20px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.b2-xitongdaohang:before {
+  content: "\e63b";
+}
+
+.b2-document1196064easyiconnet:before {
+  content: "\e623";
+}
+
+.b2-ask:before {
+  content: "\e609";
+}
+
+.b2-dingding:before {
+  content: "\e709";
+}
+
+.b2-huawei:before {
+  content: "\ebc4";
+}
+
+.b2-xiaomi:before {
+  content: "\ed18";
+}
+
+.b2-alipay-fill1:before {
+  content: "\e7c7";
+}
+
+.b2-baidu-fill:before {
+  content: "\e7c8";
+}
+
+.b2-facebook-circle-fill:before {
+  content: "\e7ce";
+}
+
+.b2-github-fill:before {
+  content: "\e7d1";
+}
+
+.b2-google-fill:before {
+  content: "\e7d3";
+}
+
+.b2-microsoft-fill:before {
+  content: "\e7d6";
+}
+
+.b2-twitter-fill:before {
+  content: "\e7e2";
+}
+
+.b2-gitee:before {
+  content: "\e60c";
+}
+
+.b2-volume-up-line:before {
+  content: "\e826";
+}
+
+.b2-add-circle-line1:before {
+  content: "\e83a";
+}
+
+.b2-account-box-line:before {
+  content: "\e87e";
+}
+
+.b2-account-pin-box-line:before {
+  content: "\e87f";
+}
+
+.b2-bear-smile-line:before {
+  content: "\e881";
+}
+
+.b2-fire-line:before {
+  content: "\e898";
+}
+
+.b2-user-location-line:before {
+  content: "\e88d";
+}
+
+.b2-customer-service-2-line1:before {
+  content: "\e6d1";
+}
+
+.b2-download-cloud-line1:before {
+  content: "\e852";
+}
+
+.b2-brush-line:before {
+  content: "\e704";
+}
+
+.b2-mark-pen-line:before {
+  content: "\e71b";
+}
+
+.b2-eraser-fill:before {
+  content: "\e70e";
+}
+
+.b2-magic-fill:before {
+  content: "\e71a";
+}
+
+.b2-font-size-2:before {
+  content: "\e795";
+}
+
+.b2-landscape-line:before {
+  content: "\e807";
+}
+
+.b2-rmb:before {
+  content: "\e6b0";
+}
+
+.b2-flashlight-fill:before {
+  content: "\ed04";
+}
+
+.b2-battery-2-charge-line:before {
+  content: "\e700";
+}
+
+.b2-battery-2-charge-fill:before {
+  content: "\e6ff";
+}
+
+.b2-qq:before {
+  content: "\e993";
+}
+
+.b2-weixin:before {
+  content: "\e9c5";
+}
+
+.b2-weibo:before {
+  content: "\e9c9";
+}
+
+.b2-eye-off-fill:before {
+  content: "\ebe9";
+}
+
+.b2-stop-mini-fill:before {
+  content: "\eb13";
+}
+
+.b2-chat-2-line:before {
+  content: "\e65f";
+}
+
+.b2-money-cny-circle-line:before {
+  content: "\e8ae";
+}
+
+.b2-shixindiqiu:before {
+  content: "\e66a";
+}
+
+.b2-vrenzhengguanli:before {
+  content: "\e687";
+}
+
+.b2-article-line:before {
+  content: "\e76c";
+}
+
+.b2-men-line:before {
+  content: "\ecb7";
+}
+
+.b2-women-line:before {
+  content: "\ecf1";
+}
+
+.b2-check-line:before {
+  content: "\ebbf";
+}
+
+.b2-upload-fill:before {
+  content: "\ec84";
+}
+
+.b2-more-line:before {
+  content: "\ec2c";
+}
+
+.b2-arrow-drop-down-fill:before {
+  content: "\eb85";
+}
+
+.b2-arrow-drop-left-fill:before {
+  content: "\eb87";
+}
+
+.b2-arrow-drop-up-fill:before {
+  content: "\eb8b";
+}
+
+.b2-arrow-go-back-line:before {
+  content: "\eb8e";
+}
+
+.b2-arrow-go-forward-line:before {
+  content: "\eb90";
+}
+
+.b2-arrow-up-line:before {
+  content: "\ebab";
+}
+
+.b2-zoom-in-line:before {
+  content: "\ec87";
+}
+
+.b2-rotate-lock-fill:before {
+  content: "\e733";
+}
+
+.b2-lock-2-line:before {
+  content: "\ec08";
+}
+
+.b2-indeterminate-circle-line:before {
+  content: "\ebfa";
+}
+
+.b2-bar-chart-fill:before {
+  content: "\e618";
+}
+
+.b2-heart-pulse-line:before {
+  content: "\e910";
+}
+
+.b2-chat-heart-line:before {
+  content: "\e664";
+}
+
+.b2-chat-poll-line:before {
+  content: "\e665";
+}
+
+.b2-chat-quote-line:before {
+  content: "\e668";
+}
+
+.b2-double-quotes-l:before {
+  content: "\e82a";
+}
+
+.b2-emotion-line:before {
+  content: "\eca4";
+}
+
+.b2-hashtag:before {
+  content: "\e83f";
+}
+
+.b2-parent-line:before {
+  content: "\ecbc";
+}
+
+.b2-arrow-right-s-fill:before {
+  content: "\eba2";
+}
+
+.b2-customer-service-2-line:before {
+  content: "\e630";
+}
+
+.b2-chat-smile-2-line:before {
+  content: "\e667";
+}
+
+.b2-arrow-left-right-fill:before {
+  content: "\eb96";
+}
+
+.b2-profile-fill:before {
+  content: "\e64c";
+}
+
+.b2-file-3-fill:before {
+  content: "\e786";
+}
+
+.b2-movie-fill:before {
+  content: "\eab6";
+}
+
+.b2-close-circle-fill:before {
+  content: "\ebc0";
+}
+
+.b2-close-circle-line:before {
+  content: "\ebc1";
+}
+
+.b2-checkbox-circle-fill:before {
+  content: "\ebb2";
+}
+
+.b2-checkbox-circle-line:before {
+  content: "\ebb3";
+}
+
+.b2-whatsapp-line:before {
+  content: "\e9cc";
+}
+
+.b2-filter-2-line:before {
+  content: "\ebec";
+}
+
+.b2-wodegouwuche:before {
+  content: "\e655";
+}
+
+.b2-fukuanchenggongzhangdan:before {
+  content: "\e636";
+}
+
+.b2-jiesuan:before {
+  content: "\e6fd";
+}
+
+.b2-exchange-cny-line:before {
+  content: "\e897";
+}
+
+.b2-waiting:before {
+  content: "\e734";
+}
+
+.b2-check-double-line:before {
+  content: "\ebbd";
+}
+
+.b2-map-pin-fill:before {
+  content: "\ea25";
+}
+
+.b2-bank-card-fill:before {
+  content: "\e880";
+}
+
+.b2-coins-fill:before {
+  content: "\e886";
+}
+
+.b2-vip-line:before {
+  content: "\e8ef";
+}
+
+.b2-alipay-fill:before {
+  content: "\e931";
+}
+
+.b2-paypal-fill:before {
+  content: "\e989";
+}
+
+.b2-wechat-pay-fill:before {
+  content: "\e9c7";
+}
+
+.b2-tang:before {
+  content: "\e6ec";
+}
+
+.b2-star-line:before {
+  content: "\ec6b";
+}
+
+.b2-edit-2-line:before {
+  content: "\e68e";
+}
+
+.b2-share-forward-fill:before {
+  content: "\ec4f";
+}
+
+.b2-star-fill:before {
+  content: "\ec68";
+}
+
+.b2-price-tag-3-line:before {
+  content: "\e8c0";
+}
+
+.b2-play-mini-fill:before {
+  content: "\eae1";
+}
+
+.b2-rhythm-line:before {
+  content: "\eaf8";
+}
+
+.b2-download1:before {
+  content: "\e604";
+}
+
+.b2-caozuoshili:before {
+  content: "\e690";
+}
+
+.b2-suo1:before {
+  content: "\e691";
+}
+
+.b2-lock-2-fill:before {
+  content: "\ec07";
+}
+
+.b2-chat-2-fill:before {
+  content: "\e65e";
+}
+
+.b2-play-circle-line:before {
+  content: "\ead8";
+}
+
+.b2-message-3-fill:before {
+  content: "\e669";
+}
+
+.b2-login-circle-line:before {
+  content: "\ec11";
+}
+
+.b2-user-settings-line:before {
+  content: "\ece4";
+}
+
+.b2-skull-2-line:before {
+  content: "\ecc0";
+}
+
+.b2-vip-crown-2-line:before {
+  content: "\e8ea";
+}
+
+.b2-vip-diamond-line:before {
+  content: "\e8ed";
+}
+
+.b2-task-line:before {
+  content: "\e81f";
+}
+
+.b2-share-line:before {
+  content: "\ec51";
+}
+
+.b2-bit-coin-line:before {
+  content: "\e883";
+}
+
+.b2-coins-line:before {
+  content: "\e887";
+}
+
+.b2-add-circle-line:before {
+  content: "\eb72";
+}
+
+.b2-notification-badge-line:before {
+  content: "\ec2e";
+}
+
+.b2-qr-code-fill:before {
+  content: "\e726";
+}
+
+.b2-gift-2-line:before {
+  content: "\e8a2";
+}
+
+.b2-coupon-2-line:before {
+  content: "\e88b";
+}
+
+.b2-shopping-cart-2-line:before {
+  content: "\e8da";
+}
+
+.b2-pages-line:before {
+  content: "\e817";
+}
+
+.b2-eye-fill:before {
+  content: "\ebe7";
+}
+
+.b2-download-cloud-line:before {
+  content: "\ebdf";
+}
+
+.b2-coin-line:before {
+  content: "\e885";
+}
+
+.b2-git-repository-private-line:before {
+  content: "\e6f6";
+}
+
+.b2-information-line:before {
+  content: "\ebfc";
+}
+
+.b2-dislike-fill:before {
+  content: "\e643";
+}
+
+.b2-heart-fill:before {
+  content: "\e90d";
+}
+
+.b2-thumb-down-line:before {
+  content: "\ec70";
+}
+
+.b2-thumb-up-line:before {
+  content: "\ec73";
+}
+
+.b2-donut-chart-fill:before {
+  content: "\e632";
+}
+
+.b2-chat-smile-3-line:before {
+  content: "\e666";
+}
+
+.b2-clipboard-line:before {
+  content: "\e77c";
+}
+
+.b2-close-line:before {
+  content: "\ebc3";
+}
+
+.b2-question-line:before {
+  content: "\ec30";
+}
+
+.b2-blaze-line:before {
+  content: "\ecf3";
+}
+
+.b2-flashlight-line:before {
+  content: "\ed05";
+}
+
+.b2-rocket-2-line:before {
+  content: "\ea48";
+}
+
+.b2-home-heart-line:before {
+  content: "\e612";
+}
+
+.b2-bookmark-3-line:before {
+  content: "\e61c";
+}
+
+.b2-questionnaire-line:before {
+  content: "\e66b";
+}
+
+.b2-notification-3-line:before {
+  content: "\eac0";
+}
+
+.b2-menu-fill:before {
+  content: "\ec23";
+}
+
+.b2-shield-user-line:before {
+  content: "\ec5f";
+}
+
+.b2-database-2-line:before {
+  content: "\e70d";
+}
+
+.b2-emotion-laugh-line:before {
+  content: "\eca3";
+}
+
+.b2-emotion-normal-line:before {
+  content: "\eca6";
+}
+
+.b2-arrow-down-s-line:before {
+  content: "\eb84";
+}
+
+.b2-arrow-left-s-line:before {
+  content: "\eb99";
+}
+
+.b2-arrow-right-s-line:before {
+  content: "\eba3";
+}
+
+.b2-arrow-up-s-line:before {
+  content: "\ebad";
+}
+
+.b2-mail-send-line:before {
+  content: "\e640";
+}
+
+.b2-quill-pen-line:before {
+  content: "\e6ce";
+}
+
+.b2-file-list-2-line:before {
+  content: "\e7af";
+}
+
+.b2-folder-add-line:before {
+  content: "\e7e1";
+}
+
+.b2-hand-heart-line:before {
+  content: "\e8a8";
+}
+
+.b2-dislike-line:before {
+  content: "\e8fb";
+}
+
+.b2-heart-add-line:before {
+  content: "\e90c";
+}
+
+.b2-hearts-line:before {
+  content: "\e912";
+}
+
+.b2-settings-3-line:before {
+  content: "\ec3e";
+}
+
+.b2-account-circle-line:before {
+  content: "\ec8b";
+}
+
+.b2-user-heart-line:before {
+  content: "\ecd9";
+}
+
+.b2-add-line:before {
+  content: "\eb74";
+}
+
+.b2-subtract-line:before {
+  content: "\ec6f";
+}
+
+.b2-pantone-line:before {
+  content: "\e6c7";
+}
+
+.b2-exchange-box-line:before {
+  content: "\e895";
+}
+
+.b2-shopping-bag-line:before {
+  content: "\e8d4";
+}
+
+.b2-share-forward-box-fill:before {
+  content: "\ec4d";
+}
+
+.b2-qq-line:before {
+  content: "\e994";
+}
+
+.b2-wechat-line:before {
+  content: "\e9c6";
+}
+
+.b2-weibo-line:before {
+  content: "\e9ca";
+}
+
+.b2-funds-box-line1:before {
+  content: "\e642";
+}
+
+.b2-funds-box-line:before {
+  content: "\e89f";
+}
+
+.b2-external-link-line:before {
+  content: "\ebe3";
+}
+
+.b2-image-fill:before {
+  content: "\eaa9";
+}
+
+.b2-search-line:before {
+  content: "\e86e";
+}
+

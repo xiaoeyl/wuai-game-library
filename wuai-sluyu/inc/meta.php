@@ -40,7 +40,8 @@ add_action('save_post', function ($post_id) {
     }
     foreach (['version', 'platform', 'download_url', 'download_password', 'title_badge'] as $key) {
         if (isset($_POST['wuai_sluyu_' . $key])) {
-            update_post_meta($post_id, '_wuai_sluyu_' . $key, sanitize_text_field(wp_unslash($_POST['wuai_sluyu_' . $key])));
+            $value = wp_unslash($_POST['wuai_sluyu_' . $key]);
+            update_post_meta($post_id, '_wuai_sluyu_' . $key, $key === 'download_url' ? esc_url_raw($value, ['http', 'https']) : sanitize_text_field($value));
         }
     }
     if (isset($_POST['wuai_sluyu_title_badge_color'])) {

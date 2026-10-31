@@ -53,7 +53,7 @@ $seo_description = !empty($options['seo_description']) ? $options['seo_descripti
                 <span>文章</span><input type="search" name="s" placeholder="搜索" value="<?php echo esc_attr(get_search_query()); ?>"><button type="submit" aria-label="搜索">⌕</button>
             </form>
             <?php if (is_user_logged_in()) : ?>
-                <a class="sluyu-login" href="<?php echo esc_url(get_edit_profile_url()); ?>"><?php echo esc_html(wp_get_current_user()->display_name); ?></a>
+                <a class="sluyu-login" href="#sluyu-dialog" data-sluyu-panel="account"><?php echo esc_html(wp_get_current_user()->display_name); ?></a>
             <?php else : ?>
                 <a class="sluyu-login" href="<?php echo esc_url(wp_login_url()); ?>">登录 | 注册</a>
             <?php endif; ?>

@@ -29,6 +29,29 @@ function wuai_sluyu_defaults() {
         'border_radius' => '12',
         'content_width' => '1250',
         'footer_text' => '记录每一份热爱，分享每一次发现。',
+        'footer_description' => '提供网络资源分享，图集画册，写真美图，动漫周边，动漫美图，动漫资讯，p站插画，cosplay，游戏资源等精品资源。找美图，找游戏，发现更多热爱~',
+        'footer_banner' => wuai_sluyu_asset('images/sluyu/2026032501495748.jpg'),
+        'footer_banner_url' => '',
+        'footer_copyright' => '',
+        'footer_show_stats' => '1',
+        'footer_terms_url' => '',
+        'footer_disclaimer_url' => '',
+        'footer_circle_url' => '',
+        'footer_verify_url' => '',
+        'footer_help_url' => '',
+        'footer_about_url' => '',
+        'rail_vip_url' => '',
+        'rail_account_url' => '',
+        'rail_cart_url' => '',
+        'rail_coupon_url' => '',
+        'rail_message_url' => '',
+        'rail_support_url' => '',
+        'rail_support_text' => '如有资源问题，请在对应文章下留言，我们会尽快处理。',
+        'rail_group_qr' => '',
+        'article_banner' => wuai_sluyu_asset('images/sluyu/2026032501495748.jpg'),
+        'article_show_cover' => '0',
+        'article_show_toc' => '1',
+        'article_show_related' => '1',
         'show_floating_tools' => '1',
         'show_mobile_nav' => '1',
         'enable_lightbox' => '1',
@@ -55,9 +78,9 @@ function wuai_sluyu_sanitize_options($input) {
     $defaults = wuai_sluyu_defaults();
     $input = is_array($input) ? $input : [];
     $output = $defaults;
-    $switches = ['show_post_meta', 'show_resource_box', 'enable_comments', 'show_floating_tools', 'show_mobile_nav', 'enable_lightbox', 'enable_loader', 'enable_particles', 'glass_cards', 'color_scrollbar', 'enable_og', 'legacy_html_links'];
-    $urls = ['site_logo', 'site_icon', 'hero_video', 'hero_image', 'promo_image', 'ad_image'];
-    $multiline = ['site_description', 'hero_notice', 'sections', 'seo_description', 'footer_text'];
+    $switches = ['show_post_meta', 'show_resource_box', 'enable_comments', 'show_floating_tools', 'show_mobile_nav', 'enable_lightbox', 'enable_loader', 'enable_particles', 'glass_cards', 'color_scrollbar', 'enable_og', 'legacy_html_links', 'footer_show_stats', 'article_show_cover', 'article_show_toc', 'article_show_related'];
+    $urls = ['site_logo', 'site_icon', 'hero_video', 'hero_image', 'promo_image', 'ad_image', 'footer_banner', 'footer_banner_url', 'footer_terms_url', 'footer_disclaimer_url', 'footer_circle_url', 'footer_verify_url', 'footer_help_url', 'footer_about_url', 'rail_vip_url', 'rail_account_url', 'rail_cart_url', 'rail_coupon_url', 'rail_message_url', 'rail_support_url', 'rail_group_qr', 'article_banner'];
+    $multiline = ['site_description', 'hero_notice', 'sections', 'seo_description', 'footer_text', 'footer_description', 'rail_support_text'];
     foreach ($defaults as $key => $default) {
         if (!array_key_exists($key, $input) || !is_scalar($input[$key])) {
             continue;
@@ -199,8 +222,33 @@ function wuai_sluyu_register_csf_options() {
     CSF::createSection($prefix, [
         'parent' => 'basic', 'title' => '页脚与导航', 'icon' => 'fa fa-bars',
         'fields' => [
+            wuai_sluyu_csf_field('footer_description', 'textarea', '页脚网站介绍'),
             wuai_sluyu_csf_field('footer_text', 'textarea', '页脚说明'),
+            wuai_sluyu_csf_field('footer_banner', 'upload', '页脚上方横幅', ['desc' => '留空隐藏；默认使用参考站的装饰横幅。']),
+            wuai_sluyu_csf_field('footer_banner_url', 'text', '横幅链接', ['desc' => '填写你自己的社群或活动地址；留空时展示图片。']),
+            wuai_sluyu_csf_field('footer_copyright', 'text', '版权名称', ['desc' => '留空时使用站点显示名称。']),
+            wuai_sluyu_csf_field('footer_show_stats', 'switcher', '显示本次页面查询耗时'),
+            wuai_sluyu_csf_field('footer_terms_url', 'text', '用户说明链接'),
+            wuai_sluyu_csf_field('footer_disclaimer_url', 'text', '免责声明链接'),
+            wuai_sluyu_csf_field('footer_circle_url', 'text', '次元圈子链接'),
+            wuai_sluyu_csf_field('footer_verify_url', 'text', '认证服务链接'),
+            wuai_sluyu_csf_field('footer_help_url', 'text', '帮助文档链接'),
+            wuai_sluyu_csf_field('footer_about_url', 'text', '关于本站链接'),
             ['type' => 'content', 'content' => '<p>主导航和页脚导航使用 WordPress 菜单管理。</p><a class="button" href="' . esc_url(admin_url('nav-menus.php')) . '">管理导航菜单</a>'],
+        ],
+    ]);
+    CSF::createSection($prefix, [
+        'parent' => 'basic', 'title' => '右侧快捷导航', 'icon' => 'fa fa-th-list',
+        'description' => '填写你自己的页面地址。未设置时优先识别已有页面；未开放的服务显示说明，不跳到不存在的页面。',
+        'fields' => [
+            wuai_sluyu_csf_field('rail_vip_url', 'text', '会员中心链接'),
+            wuai_sluyu_csf_field('rail_account_url', 'text', '个人中心链接'),
+            wuai_sluyu_csf_field('rail_cart_url', 'text', '购物车链接'),
+            wuai_sluyu_csf_field('rail_coupon_url', 'text', '优惠券链接'),
+            wuai_sluyu_csf_field('rail_message_url', 'text', '私信列表链接'),
+            wuai_sluyu_csf_field('rail_support_url', 'text', '客服链接'),
+            wuai_sluyu_csf_field('rail_support_text', 'textarea', '客服说明'),
+            wuai_sluyu_csf_field('rail_group_qr', 'upload', '社群二维码', ['desc' => '留空时只显示当前页面二维码。']),
         ],
     ]);
     CSF::createSection($prefix, ['id' => 'home', 'title' => '首页布局', 'icon' => 'fa fa-home']);
@@ -230,6 +278,10 @@ function wuai_sluyu_register_csf_options() {
             wuai_sluyu_csf_field('show_post_meta', 'switcher', '显示文章信息'),
             wuai_sluyu_csf_field('show_resource_box', 'switcher', '显示资源下载区'),
             wuai_sluyu_csf_field('enable_comments', 'switcher', '显示文章评论'),
+            wuai_sluyu_csf_field('article_banner', 'upload', '文章顶部横幅'),
+            wuai_sluyu_csf_field('article_show_cover', 'switcher', '正文前显示特色图片', ['desc' => '参考站正文直接从文章内容开始，默认关闭独立大封面。']),
+            wuai_sluyu_csf_field('article_show_toc', 'switcher', '显示文章目录'),
+            wuai_sluyu_csf_field('article_show_related', 'switcher', '显示相关推荐'),
             wuai_sluyu_csf_field('legacy_html_links', 'switcher', '使用 .html 文章地址', ['desc' => '更改后请在“设置 → 固定链接”保存一次，刷新重写规则。']),
         ],
     ]);

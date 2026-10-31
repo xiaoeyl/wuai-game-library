@@ -16,3 +16,9 @@ Integration changes:
 - Layer a small theme adaptation stylesheet over the supplied Zibll stylesheet. The header identifies this theme as WUAI.
 
 This integration provides the settings framework and this theme's settings. It does not claim to implement the full Zibll theme, its licensed services, commerce features or other business modules.
+
+## Front-end reference assets (v1.0.7)
+
+The owner-supplied `Zz_www.sluyu.com` snapshot provides the footer illustrations, VIP icon, B2 icon font (`assets/vendor/sluyu-icons`) and OPPOSans display font. Layout rules in `assets/css/layout.css` are adapted from measurements of its footer, utility rail and article structure; remote business scripts, original site statistics and article records are not imported.
+
+`assets/vendor/qrious/qrious.min.js` is QRious 4.0.2, copyright 2017 Alasdair Mercer, based on jsqrencode, distributed under GPL v3. Its original license header is retained. It generates a QR code locally for the current page URL.
