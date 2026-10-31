@@ -34,7 +34,7 @@
 发布新的 GitHub Release 时，上传顶层目录为 `wuai-sluyu` 的 ZIP，例如：
 
 ```text
-wuai-sluyu-v1.0.9.zip
+wuai-sluyu-v1.0.10.zip
 ```
 
 后台会通过 GitHub Releases API 检查新版本，不需要在主题中保存 PAT。
@@ -98,3 +98,9 @@ wuai-sluyu-v1.0.9.zip
 - 修复脚本延迟执行、禁用 JavaScript、前进后退和重复刷新时可能残留遮罩的问题；遮罩不拦截点击，兼容减少动态效果设置。
 
 `node tests/loader.cjs` 验证加载布局、慢资源、脚本缺失、无 JavaScript、返回缓存、刷新及动画开关。`WP_QA_SOURCE` 可指定独立发布目录。
+
+## v1.0.10
+
+- 保留 v1.0.9 的加载动画修复。
+- 后台更新状态以磁盘实际版本为准，手动上传替换成功后会收起上次中断的更新进度。
+- 无进展的更新任务在 5 分钟后提示超时，避免网关中断后长期停在下载状态。

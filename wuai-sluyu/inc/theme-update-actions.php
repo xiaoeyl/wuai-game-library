@@ -35,10 +35,14 @@ function wuai_sluyu_update_progress($phase, $percent, $message, $extra = []) {
 add_action('wp_ajax_wuai_sluyu_update_status', function () {
     wuai_sluyu_update_auth();
     $job = get_option('wuai_sluyu_update_job', []);
-    if ($job && !in_array($job['phase'], ['complete', 'error'], true) && time() - $job['updated_at'] > 15 * MINUTE_IN_SECONDS) {
+    $installed = wuai_sluyu_installed_version();
+    // A manual upload may finish an interrupted online update. Trust the disk version.
+    if ($job && $job['phase'] !== 'complete' && !empty($job['target']) && version_compare($installed, $job['target'], '>=')) {
+        $job = wuai_sluyu_update_progress('complete', 100, '当前已安装主题 V' . $installed . '，请刷新页面载入新版。');
+    } elseif ($job && !in_array($job['phase'], ['complete', 'error'], true) && time() - $job['updated_at'] > 5 * MINUTE_IN_SECONDS) {
         $job = wuai_sluyu_update_progress('error', $job['percent'], '更新进程已超时，请检查服务器日志和主题版本后重试。');
     }
-    wp_send_json_success(['job' => $job, 'current' => wuai_sluyu_installed_version()]);
+    wp_send_json_success(['job' => $job, 'current' => $installed]);
 });
 
 /** Validate before WordPress moves the old theme, also for native WP updates. */
