@@ -13,15 +13,19 @@ function wuai_sluyu_lock($key) {
     $token = time() . ':' . wp_generate_uuid4();
     // add_option() uses an upsert, so it is not a safe compare-and-insert lock.
     $inserted = $wpdb->query($wpdb->prepare("INSERT IGNORE INTO $wpdb->options (option_name,option_value,autoload) VALUES (%s,%s,'no')", $name, $token));
+    if ($inserted === 1) { $GLOBALS['wuai_sluyu_request_locks'][$name] = $token; }
     return $inserted === 1 ? [$name, $token] : false;
 }
 function wuai_sluyu_unlock($lock) {
     global $wpdb;
-    if ($lock) { $wpdb->query($wpdb->prepare("DELETE FROM $wpdb->options WHERE option_name=%s AND option_value=%s", $lock[0], $lock[1])); }
+    if ($lock) {
+        $wpdb->query($wpdb->prepare("DELETE FROM $wpdb->options WHERE option_name=%s AND option_value=%s", $lock[0], $lock[1]));
+        if (($GLOBALS['wuai_sluyu_request_locks'][$lock[0]] ?? null) === $lock[1]) { unset($GLOBALS['wuai_sluyu_request_locks'][$lock[0]]); }
+    }
 }
 
 function wuai_sluyu_install_storage() {
-    if (get_option('wuai_sluyu_storage_version') === '4') { return; }
+    if (get_option('wuai_sluyu_storage_version') === '5') { return; }
     global $wpdb;
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $charset = $wpdb->get_charset_collate();
@@ -87,14 +91,22 @@ function wuai_sluyu_install_storage() {
         KEY owner_created (owner_id,created_at),
         KEY status_expiry (status,expires_at)
     ) $charset;");
-    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $events)) === $events && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $messages)) === $messages && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $memberships)) === $memberships) {
-        $columns=$wpdb->get_col("SHOW COLUMNS FROM $messages");
-        if (in_array('sender_deleted',$columns,true) && in_array('recipient_deleted',$columns,true) && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$invites))===$invites && !array_diff(['id','code_hash','code_hint','owner_id','claimed_by','status','expires_at','created_at','claimed_at','reserve_token','reserve_fingerprint','reserved_at'],$wpdb->get_col("SHOW COLUMNS FROM $invites"))) { update_option('wuai_sluyu_storage_version', '4', false); }
+    if (function_exists('wuai_sluyu_economy_schema') && function_exists('wuai_sluyu_bounty_schema')) {
+        dbDelta(wuai_sluyu_economy_schema());
+        dbDelta(wuai_sluyu_bounty_schema());
+        if (wuai_sluyu_economy_storage_ready(true)) { update_option('wuai_sluyu_storage_version', '5', false); }
     }
 }
 add_action('after_setup_theme', 'wuai_sluyu_install_storage', 30);
 
 function wuai_sluyu_event($user_id, $key, $type, $points = 0, $target = 0, $payload = '') {
+    if (!is_int($points)) { return false; }
+    if ($points !== 0) {
+        if (!function_exists('wuai_sluyu_economy_event')) { return false; }
+        $saved = wuai_sluyu_economy_event($user_id, $key, $type, $points, $target, $payload);
+        // Preserve the legacy INSERT boundary: duplicates do not advance counters.
+        return !is_wp_error($saved) && !empty($saved['created']) ? 1 : false;
+    }
     global $wpdb;
     return $wpdb->insert(wuai_sluyu_table('events'), ['user_id'=>$user_id,'event_key'=>$key,'event_type'=>$type,'target_id'=>$target,'points'=>$points,'payload'=>$payload,'created_at'=>current_time('mysql')], ['%d','%s','%s','%d','%d','%s','%s']);
 }
@@ -102,7 +114,45 @@ function wuai_sluyu_has_event($user_id, $key) {
     global $wpdb; return (bool) $wpdb->get_var($wpdb->prepare('SELECT id FROM ' . wuai_sluyu_table('events') . ' WHERE user_id=%d AND event_key=%s', $user_id, $key));
 }
 function wuai_sluyu_points($user_id) {
-    global $wpdb; return (int) $wpdb->get_var($wpdb->prepare('SELECT COALESCE(SUM(points),0) FROM ' . wuai_sluyu_table('events') . ' WHERE user_id=%d', $user_id));
+    return function_exists('wuai_sluyu_economy_balance') ? wuai_sluyu_economy_balance($user_id) : new WP_Error('economy_unavailable', '完整积分记账尚未就绪。');
+}
+function wuai_sluyu_points_available($user_id) {
+    if (!function_exists('wuai_sluyu_bounty_due_for_user')) { return new WP_Error('economy_unavailable', '完整积分记账尚未就绪。'); }
+    $settled = wuai_sluyu_bounty_due_for_user($user_id);
+    return is_wp_error($settled) ? $settled : wuai_sluyu_points($user_id);
+}
+function wuai_sluyu_points_label($value) {
+    return is_int($value) ? (string) $value : '积分暂不可用';
+}
+function wuai_sluyu_points_operation_enter($uid, $purpose) {
+    $uid = absint($uid);
+    if (!$uid || !function_exists('wuai_sluyu_economy_enter')) { return new WP_Error('economy_unavailable', '积分记账暂不可用。'); }
+    global $wpdb; $name = 'wuai_lock_user_' . $uid; $user_lock = false;
+    $owned = $GLOBALS['wuai_sluyu_request_locks'][$name] ?? '';
+    if ($owned !== '') {
+        $actual = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM $wpdb->options WHERE option_name=%s", $name));
+        if ($wpdb->last_error || !is_string($actual) || !hash_equals($owned, $actual)) { return new WP_Error('economy_user_lock', '账号操作锁已变化，请刷新重试。'); }
+    } else {
+        // Never acquire a user lock inside a previously acquired economy guard.
+        if (wuai_sluyu_economy_current_token() !== '') { return new WP_Error('economy_lock_order', '积分操作顺序无效，本次未执行。'); }
+        $user_lock = wuai_sluyu_lock('user_' . $uid);
+        if (!$user_lock) { return new WP_Error('economy_user_busy', '账号正在执行其他操作，请稍后重试。'); }
+    }
+    $economy = wuai_sluyu_economy_enter($purpose);
+    if (is_wp_error($economy)) { wuai_sluyu_unlock($user_lock); return $economy; }
+    clean_user_cache($uid); wp_cache_delete($uid, 'user_meta');
+    if (!get_userdata($uid) || wuai_sluyu_banned($uid)) { wuai_sluyu_economy_leave($economy); wuai_sluyu_unlock($user_lock); return new WP_Error('economy_account', '当前账号不可执行积分操作。'); }
+    return ['user'=>$user_lock, 'economy'=>$economy];
+}
+function wuai_sluyu_points_operation_leave($guard) {
+    if (!is_array($guard)) { return; }
+    wuai_sluyu_economy_leave($guard['economy']); wuai_sluyu_unlock($guard['user']);
+}
+function wuai_sluyu_checkin_save_counters($uid, $values) {
+    foreach ($values as $key=>$value) { update_user_meta($uid, $key, $value); }
+    wp_cache_delete($uid, 'user_meta');
+    foreach ($values as $key=>$value) { if ((string) get_user_meta($uid, $key, true) !== (string) $value) { return false; } }
+    return true;
 }
 function wuai_sluyu_events($user_id, $type = '', $limit = 30, $offset = 0) {
     global $wpdb;
@@ -140,19 +190,23 @@ function wuai_sluyu_saved_meta_matches($post_id,$expected) {
     return true;
 }
 function wuai_sluyu_checkin($user_id) {
+    $guard = wuai_sluyu_points_operation_enter($user_id, 'checkin'); if (is_wp_error($guard)) { return $guard; }
+    try {
+    $balance = wuai_sluyu_points_available($user_id); if (is_wp_error($balance)) { return $balance; }
     $today = wp_date('Y-m-d');
     $previous = get_user_meta($user_id, '_wuai_sluyu_checkin_date', true);
     if ($previous === $today || wuai_sluyu_has_event($user_id, 'checkin:' . $today)) {
-        return ['message'=>'今天已经签到啦。','days'=>(int) get_user_meta($user_id,'_wuai_sluyu_checkin_days',true),'points'=>wuai_sluyu_points($user_id)];
+        return ['message'=>'今天已经签到啦。','days'=>(int) get_user_meta($user_id,'_wuai_sluyu_checkin_days',true),'points'=>$balance];
     }
-    $reward = max(0, (int) wuai_sluyu_option('checkin_points', 10));
+    $reward = min(10000, max(0, (int) wuai_sluyu_option('checkin_points', 10)));
     if (!wuai_sluyu_event($user_id, 'checkin:' . $today, 'checkin', $reward, 0, '每日签到')) { return new WP_Error('storage', '签到保存失败，请稍后重试。'); }
     $streak = $previous === current_datetime()->modify('-1 day')->format('Y-m-d') ? (int) get_user_meta($user_id, '_wuai_checkin_streak', true) + 1 : 1;
     $days = (int) get_user_meta($user_id, '_wuai_sluyu_checkin_days', true) + 1;
-    update_user_meta($user_id, '_wuai_sluyu_checkin_date', $today);
-    update_user_meta($user_id, '_wuai_sluyu_checkin_days', $days);
-    update_user_meta($user_id, '_wuai_checkin_streak', $streak);
-    return ['message'=>'签到成功，获得 ' . $reward . ' 积分。','days'=>$days,'streak'=>$streak,'points'=>wuai_sluyu_points($user_id)];
+    $counted = wuai_sluyu_checkin_save_counters($user_id, ['_wuai_sluyu_checkin_date'=>$today, '_wuai_sluyu_checkin_days'=>$days, '_wuai_checkin_streak'=>$streak]);
+    if (!$counted) { return new WP_Error('checkin_partial', '签到凭证已保存，积分不会重复发放，但累计天数未完整确认；请联系管理员核对，不要重复补账。'); }
+    $balance = wuai_sluyu_points($user_id);
+    return ['message'=>'签到成功，获得 ' . $reward . ' 积分。','days'=>$days,'streak'=>$streak,'points'=>is_wp_error($balance) ? null : $balance];
+    } finally { wuai_sluyu_points_operation_leave($guard); }
 }
 function wuai_sluyu_tasks($user_id) {
     $today = wp_date('Y-m-d');
@@ -172,25 +226,31 @@ function wuai_sluyu_community_operation($operation, $user_id) {
     if ($extension !== null) { return $extension; }
     if ($operation === 'checkin') { return wuai_sluyu_checkin($user_id); }
     if ($operation === 'makeup') {
+        $guard = wuai_sluyu_points_operation_enter($user_id, 'makeup'); if (is_wp_error($guard)) { return $guard; }
+        try {
         $previous = get_user_meta($user_id, '_wuai_sluyu_checkin_date', true);
         $start = wuai_sluyu_parse_date($previous);
         $gap = $start ? (int) $start->diff(current_datetime()->setTime(0, 0))->format('%r%a') - 1 : 0;
-        $cost = max(1, (int) wuai_sluyu_option('makeup_points', 30)) * $gap;
+        $cost = min(10000, max(1, (int) wuai_sluyu_option('makeup_points', 30))) * $gap;
         if ($gap < 1 || $gap > 7) { return new WP_Error('gap','仅支持补签最近 1 至 7 天的连续缺签。'); }
-        if (wuai_sluyu_points($user_id) < $cost) { return new WP_Error('points','积分不足，本次补签需要 ' . $cost . ' 积分。'); }
+        $balance = wuai_sluyu_points_available($user_id); if (is_wp_error($balance)) { return $balance; }
+        if ($balance < $cost) { return new WP_Error('points','积分不足，本次补签需要 ' . $cost . ' 积分。'); }
         if (!wuai_sluyu_event($user_id, 'makeup:' . $previous, 'makeup', -$cost, 0, '补签 ' . $gap . ' 天')) { return new WP_Error('duplicate','该次补签已经处理。'); }
-        update_user_meta($user_id, '_wuai_sluyu_checkin_date', current_datetime()->modify('-1 day')->format('Y-m-d'));
-        update_user_meta($user_id, '_wuai_sluyu_checkin_days', (int) get_user_meta($user_id, '_wuai_sluyu_checkin_days', true) + $gap);
-        update_user_meta($user_id, '_wuai_checkin_streak', (int) get_user_meta($user_id, '_wuai_checkin_streak', true) + $gap);
+        $counted = wuai_sluyu_checkin_save_counters($user_id, ['_wuai_sluyu_checkin_date'=>current_datetime()->modify('-1 day')->format('Y-m-d'), '_wuai_sluyu_checkin_days'=>(int) get_user_meta($user_id, '_wuai_sluyu_checkin_days', true) + $gap, '_wuai_checkin_streak'=>(int) get_user_meta($user_id, '_wuai_checkin_streak', true) + $gap]);
+        if (!$counted) { return new WP_Error('makeup_partial', '补签扣分凭证已保存，但累计天数未完整确认；不会为同一补签重复扣分，请联系管理员核对。'); }
         return ['message'=>'补签成功，扣除 ' . $cost . ' 积分。','reload'=>true];
+        } finally { wuai_sluyu_points_operation_leave($guard); }
     }
     if ($operation === 'task') {
+        $guard = wuai_sluyu_points_operation_enter($user_id, 'task'); if (is_wp_error($guard)) { return $guard; }
+        try {
         $tasks = wuai_sluyu_tasks($user_id); $key = wuai_sluyu_input('task');
         if (!isset($tasks[$key]) || !$tasks[$key][3]) { return new WP_Error('task','请先完成对应任务。'); }
         $task = $tasks[$key];
         if (wuai_sluyu_has_event($user_id, $task[2])) { return new WP_Error('claimed','奖励已经领取。'); }
         if (!wuai_sluyu_event($user_id, $task[2], 'task', $task[1], 0, $task[0])) { return new WP_Error('storage','领取失败，请重试。'); }
         return ['message'=>'领取成功，获得 ' . $task[1] . ' 积分。','reload'=>true];
+        } finally { wuai_sluyu_points_operation_leave($guard); }
     }
     if ($operation === 'profile') {
         $name = wuai_sluyu_input('display_name'); $description = wuai_sluyu_input('description', true);
@@ -204,7 +264,9 @@ function wuai_sluyu_community_operation($operation, $user_id) {
         } elseif (!wuai_sluyu_public_post($id)) { return new WP_Error('post','内容不存在或尚未公开。'); }
         $key = $operation . ':' . $id; $exists = wuai_sluyu_has_event($user_id, $key);
         if ($operation === 'news_vote' && get_post_type($id) !== 'sluyu_news') { return new WP_Error('post','无效的快讯。'); }
-        if ($exists) { $wpdb->delete($events, ['user_id'=>$user_id,'event_key'=>$key]); }
+        if ($exists) {
+            if ($wpdb->delete($events, ['user_id'=>$user_id,'event_key'=>$key,'event_type'=>$operation,'points'=>0]) !== 1) { return new WP_Error('storage', '互动记录未能安全移除，请刷新或联系管理员。'); }
+        }
         elseif (!wuai_sluyu_event($user_id, $key, $operation, 0, $id, $operation === 'news_vote' ? (wuai_sluyu_input('direction') === 'down' ? 'down' : 'up') : '')) { return new WP_Error('storage','操作未保存，请重试。'); }
         return ['message'=>$exists ? '已取消。' : '操作成功。','selected'=>!$exists];
     }
@@ -263,6 +325,7 @@ function wuai_sluyu_community_operation($operation, $user_id) {
     }
     if ($operation === 'accept') {
         $comment = get_comment($id); $post = $comment ? wuai_sluyu_public_post($comment->comment_post_ID, ['sluyu_topic']) : false;
+        if ($comment && function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($comment->comment_post_ID)) { return new WP_Error('bounty_explicit', '悬赏只能通过专用确认采纳操作结算。'); }
         if (!$post || ((int)$post->post_author !== $user_id && !current_user_can('moderate_comments')) || $comment->comment_approved !== '1' || get_post_meta($post->ID,'_wuai_topic_kind',true) !== 'question') { return new WP_Error('permission','只能采纳自己提问下已审核的回答。'); }
         update_post_meta($post->ID, '_wuai_accepted_comment', $id);
         return ['message'=>'已采纳该回答。','reload'=>true];
@@ -316,21 +379,61 @@ add_action('transition_post_status', function ($new, $old, $post) {
     }
 }, 10, 3);
 
-add_action('deleted_user', function ($user_id) {
+function wuai_sluyu_user_deletion_begin($uid) {
+    if (function_exists('wuai_sluyu_economy_current_token') && wuai_sluyu_economy_current_token() !== '') { wp_die('请勿在其他积分操作内删除账号，请结束当前操作后单独删除。', '', ['response'=>409]); }
+    $lock = wuai_sluyu_lock('user_' . $uid);
+    if (!$lock) { wp_die('此账号仍有操作正在处理，请稍后重试删除。', '', ['response'=>409]); }
+    $GLOBALS['wuai_sluyu_user_deletion_locks'][$uid] = $lock;
+    $guard = function_exists('wuai_sluyu_economy_enter') ? wuai_sluyu_economy_enter('delete_user') : new WP_Error('economy_unavailable', '完整积分记账尚未就绪，暂不能删除账号。');
+    if (is_wp_error($guard)) { wp_die(esc_html($guard->get_error_message()), '', ['response'=>409]); }
+    $GLOBALS['wuai_sluyu_user_deletion_economy'][$uid] = $guard;
+    $result = wuai_sluyu_bounty_user_deleting($uid, $guard['token']);
+    // The bounty lifecycle must explicitly approve deletion. Treat any
+    // non-true value (including a legacy false) as a fail-closed response.
+    if ($result !== true) {
+        wuai_sluyu_economy_leave($guard); unset($GLOBALS['wuai_sluyu_user_deletion_economy'][$uid]);
+        $message = is_wp_error($result) ? $result->get_error_message() : '账号删除缺少完整悬赏记账保护，暂不能删除账号。';
+        wp_die(esc_html($message), '', ['response'=>409]);
+    }
+}
+add_action('delete_user', 'wuai_sluyu_user_deletion_begin', 1);
+
+function wuai_sluyu_multisite_user_deletion_block($uid) {
+    if (!is_multisite()) { return; }
+    wp_die('多站点账号删除未接入跨站点积分记账保护，请使用网络级核验流程。', '', ['response'=>409]);
+}
+// wpmu_delete_user() does not fire delete_user; reject it before core starts
+// removing memberships, metadata, posts, or the users row.
+add_action('wpmu_delete_user', 'wuai_sluyu_multisite_user_deletion_block', 1);
+
+function wuai_sluyu_user_deleted_cleanup($uid) {
+    $guard = $GLOBALS['wuai_sluyu_user_deletion_economy'][$uid] ?? null;
+    if (!$guard || !function_exists('wuai_sluyu_economy_delete_user_events')) { return new WP_Error('economy_delete_guard', '账号删除缺少完整记账保护，积分记录未清除。'); }
+    $removed = wuai_sluyu_economy_delete_user_events($uid, $guard['token']);
+    if (is_wp_error($removed)) { return $removed; }
     global $wpdb;
-    $wpdb->delete(wuai_sluyu_table('events'), ['user_id'=>$user_id]);
-    $wpdb->delete(wuai_sluyu_table('events'), ['event_type'=>'follow','target_id'=>$user_id]);
-    $wpdb->delete(wuai_sluyu_table('memberships'), ['user_id'=>$user_id]);
-    $wpdb->query($wpdb->prepare('DELETE FROM ' . wuai_sluyu_table('messages') . ' WHERE sender_id=%d OR recipient_id=%d', $user_id, $user_id));
-});
-add_action('delete_user',function($uid){
-    $lock=wuai_sluyu_lock('user_'.$uid);
-    if(!$lock)wp_die('此账号仍有操作正在处理，请稍后重试删除。','',['response'=>409]);
-    $GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]=$lock;
-},1);
-add_action('deleted_user',function($uid){
-    if(isset($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid])) { wuai_sluyu_unlock($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]); unset($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]); }
-},100);
+    $results = [
+        $wpdb->delete(wuai_sluyu_table('events'), ['event_type'=>'follow','target_id'=>$uid,'points'=>0]),
+        $wpdb->delete(wuai_sluyu_table('memberships'), ['user_id'=>$uid]),
+        $wpdb->query($wpdb->prepare('DELETE FROM ' . wuai_sluyu_table('messages') . ' WHERE sender_id=%d OR recipient_id=%d', $uid, $uid)),
+    ];
+    if (in_array(false, $results, true)) { return new WP_Error('economy_delete_partial', '账号已删除，但社区记录清理尚未完成；请停机核验，最少量悬赏分配凭证继续保留。'); }
+    $GLOBALS['wuai_sluyu_user_deletion_cleaned'][$uid] = true;
+    return true;
+}
+add_action('deleted_user', function ($uid) {
+    $result = wuai_sluyu_user_deleted_cleanup($uid);
+    if (is_wp_error($result)) { wp_die(esc_html($result->get_error_message()), '', ['response'=>409]); }
+}, 1);
+add_action('deleted_user', function ($uid) {
+    // An aborted deletion never reaches this release. Shutdown releases only
+    // the legacy account lease, never the durable economic mutex.
+    if (empty($GLOBALS['wuai_sluyu_user_deletion_cleaned'][$uid])) { return; }
+    $guard = $GLOBALS['wuai_sluyu_user_deletion_economy'][$uid] ?? null;
+    if ($guard) { wuai_sluyu_economy_leave($guard); unset($GLOBALS['wuai_sluyu_user_deletion_economy'][$uid]); }
+    if (isset($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid])) { wuai_sluyu_unlock($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]); unset($GLOBALS['wuai_sluyu_user_deletion_locks'][$uid]); }
+    unset($GLOBALS['wuai_sluyu_user_deletion_cleaned'][$uid]);
+}, PHP_INT_MAX);
 add_action('shutdown',function(){
     foreach($GLOBALS['wuai_sluyu_user_deletion_locks']??[] as $lock)wuai_sluyu_unlock($lock);
 });

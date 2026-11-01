@@ -9,7 +9,9 @@ function wuai_sluyu_account_types() {
 }
 
 function wuai_sluyu_account_tabs() {
-    return ['overview'=>'资料概览','bookmarks'=>'我的收藏','submissions'=>'投稿与申请','following'=>'我的关注','followers'=>'我的粉丝','comments'=>'我的评论'];
+    $tabs=['overview'=>'资料概览','bookmarks'=>'我的收藏','submissions'=>'投稿与申请','following'=>'我的关注','followers'=>'我的粉丝','comments'=>'我的评论'];
+    if(function_exists('wuai_sluyu_view_account_security'))$tabs['security']='账户安全';
+    return $tabs;
 }
 
 function wuai_sluyu_account_page_data($tab, $uid, $page = 1, $per_page = 12) {
@@ -67,6 +69,9 @@ function wuai_sluyu_account_submission_permission($post, $uid, $operation) {
     }
     if (function_exists('wuai_sluyu_circle_review_held') && wuai_sluyu_circle_review_held($post->ID)) {
         return new WP_Error('submission_review_held', '此话题的审核尚未完成，请联系站点编辑核验后再修改、撤回或删除。');
+    }
+    if (function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($post->ID)) {
+        return new WP_Error('bounty_managed', '悬赏条款与分配凭证不可直接修改、撤回或删除；请到问题页使用专用退回操作，待审稿件请联系站点管理员。');
     }
     if (in_array($post->post_type, ['sluyu_verify','sluyu_ticket'], true) && ($post->post_status === 'publish' || get_post_meta($post->ID, '_wuai_ticket_reply', true))) {
         return new WP_Error('submission_processed', '已处理的申请和工单为只读记录，请另行提交补充说明。');
@@ -200,7 +205,8 @@ function wuai_sluyu_account_render_list($tab, $uid, $page = 1, $per_page = 12, $
             echo '<div><span>';
             if ($post) { echo '<a href="' . esc_url($entry->comment_approved === '1' ? get_comment_link($entry) : get_permalink($post)) . '">' . esc_html($post->post_title) . '</a>'; }
             else { echo '<b>原内容暂不可查看</b>'; }
-            echo '<p>' . esc_html(wp_trim_words(wp_strip_all_tags($entry->comment_content), 65)) . '</p><small>' . esc_html($entry->comment_date) . ' · ' . ($entry->comment_approved === '1' ? '已通过' : '审核中') . '</small></span></div>';
+            echo '<p>' . esc_html(wp_trim_words(wp_strip_all_tags($entry->comment_content), 65)) . '</p><small>' . esc_html($entry->comment_date) . ' · ' . ($entry->comment_approved === '1' ? '已通过' : '审核中') . '</small></span>';
+            do_action('wuai_sluyu_account_comment_actions', $entry); echo '</div>';
         } elseif ($tab === 'submissions') {
             $types = wuai_sluyu_account_types();
             echo '<div><span><b>' . esc_html($entry->post_title ?: '无标题') . '</b><p class="sluyu-muted">' . esc_html(($types[$entry->post_type] ?? '') . ' · ' . wuai_sluyu_account_status($entry)) . '</p></span><div class="sluyu-button-row">';
@@ -208,6 +214,14 @@ function wuai_sluyu_account_render_list($tab, $uid, $page = 1, $per_page = 12, $
             if (!is_wp_error(wuai_sluyu_account_submission_permission($entry, $uid, 'edit_submission'))) { echo '<a class="sluyu-action-plain" href="' . esc_url(wuai_sluyu_portal_url('account', ['tab'=>'submissions','edit'=>$entry->ID])) . '">编辑</a>'; }
             if ($entry->post_status !== 'draft' && !is_wp_error(wuai_sluyu_account_submission_permission($entry, $uid, 'withdraw_submission'))) { wuai_sluyu_action_button('withdraw_submission', '撤回', ['id'=>$entry->ID,'confirm'=>'撤回后内容不再公开，重新发布需要审核。确认撤回？']); }
             if (!is_wp_error(wuai_sluyu_account_submission_permission($entry, $uid, 'delete_submission'))) { wuai_sluyu_action_button('delete_submission', '删除', ['id'=>$entry->ID,'confirm'=>'确认删除这份非公开稿件？此操作不会删除账号、订单或积分记录。']); }
+            if (function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($entry->ID)) {
+                $allocation=wuai_sluyu_bounty_row($entry->ID);
+                if (!is_wp_error($allocation) && $allocation && $allocation['requester_id']===$uid && in_array($allocation['state'],['held','open'],true)) {
+                    wuai_sluyu_form_start('bounty_withdraw');
+                    echo '<input type="hidden" name="id" value="'.absint($entry->ID).'"><input type="hidden" name="version" value="'.$allocation['version'].'"><label><span><input type="checkbox" name="confirm" value="1" required style="width:auto"> 我确认关闭问题并退回尚未发放的预留积分。</span></label>';
+                    wuai_sluyu_form_end('退回未发放悬赏并撤回');
+                }
+            }
             echo '</div></div>';
         }
     }
@@ -226,10 +240,11 @@ function wuai_sluyu_view_account_extended() {
     $following = wuai_sluyu_account_page_data('following', $uid, 1, 1);
     $followers = wuai_sluyu_account_page_data('followers', $uid, 1, 1);
     echo '<section class="sluyu-panel"><div class="sluyu-profile-heading">' . get_avatar($uid, 80) . '<div><h2>' . esc_html($user->display_name) . '</h2><p>' . esc_html(get_user_meta($uid, '_wuai_verified_title', true) ?: '普通用户') . ' · ' . (wuai_sluyu_member($uid) ? '会员有效' : '未开通会员') . '</p></div><a href="' . esc_url(wp_logout_url(home_url('/'))) . '">退出登录</a></div><div class="sluyu-stat-grid">';
-    foreach (['积分'=>wuai_sluyu_points($uid),'文章'=>count_user_posts($uid, 'post', true),'关注'=>$following['total'],'粉丝'=>$followers['total']] as $label=>$value) { echo '<div><strong>' . esc_html($value) . '</strong><span>' . esc_html($label) . '</span></div>'; }
+    foreach (['积分'=>wuai_sluyu_points_label(wuai_sluyu_points_available($uid)),'文章'=>count_user_posts($uid, 'post', true),'关注'=>$following['total'],'粉丝'=>$followers['total']] as $label=>$value) { echo '<div><strong>' . esc_html($value) . '</strong><span>' . esc_html($label) . '</span></div>'; }
     echo '</div><nav class="sluyu-filter-tabs" aria-label="个人中心栏目">';
     foreach ($tabs as $key=>$label) { echo '<a href="' . esc_url(wuai_sluyu_portal_url('account', ['tab'=>$key])) . '"' . ($tab === $key ? ' aria-current="page"' : '') . '>' . esc_html($label) . '</a>'; }
     echo '</nav></section>';
+    if ($tab === 'security' && function_exists('wuai_sluyu_view_account_security')) { wuai_sluyu_view_account_security(); return; }
     if ($tab === 'overview') {
         echo '<section class="sluyu-panel"><h2>我的资料</h2>'; wuai_sluyu_form_start('profile');
         echo '<label>昵称<input name="display_name" maxlength="40" value="' . esc_attr($user->display_name) . '" required></label><label>个人简介<textarea name="description" maxlength="500">' . esc_textarea($user->description) . '</textarea></label><label>个人网站<input type="url" name="user_url" value="' . esc_attr($user->user_url) . '"></label>';

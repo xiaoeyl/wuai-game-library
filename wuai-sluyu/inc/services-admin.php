@@ -21,6 +21,10 @@ function wuai_sluyu_service_meta($post) {
     if(in_array($post->post_type,['sluyu_news','sluyu_link'],true))echo '<p><label>来源 / 站点网址 <input class="widefat" type="url" name="wuai_source_url" value="' . esc_attr(get_post_meta($post->ID,'_wuai_source_url',true)) . '"></label></p>';
     if($post->post_type==='sluyu_topic') {
         $current_kind=get_post_meta($post->ID,'_wuai_topic_kind',true);
+        if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($post->ID)) {
+            echo '<p><label>话题类型 <select name="wuai_topic_kind" disabled><option value="'.esc_attr(is_string($current_kind)?$current_kind:'').'" selected>非现金积分悬赏 / 记账保护（类型锁定）</option></select></label></p><p>类型及预留条款不通过普通服务信息表单修改。原生发布只审核公开内容，不激活奖励；请使用独立积分审核页。已有分配记录在题型损坏或功能关闭时仍受保护。</p>';
+            return;
+        }
         $types=$current_kind==='guess'?['guess'=>'猜答案（类型锁定）']:['topic'=>'日常','question'=>'提问','poll'=>'投票'];
         echo '<p><label>话题类型 <select name="wuai_topic_kind">'; foreach($types as $value=>$label)echo '<option value="' . $value . '" ' . selected($current_kind,$value,false) . '>' . esc_html($label) . '</option>'; echo '</select></label></p><p>猜答案仅从专用前台表单创建；已有或曾有猜题配置的稿件不能通过此表单转换题型。投票创建后不可更改选项，避免已投票的数据发生错配。</p><label>投票选项（仅新投票填写，每行一项）<textarea class="widefat" name="wuai_poll_choices" rows="5">' . esc_textarea(implode("\n",(array)get_post_meta($post->ID,'_wuai_poll_choices',true))) . '</textarea></label>';
     }
@@ -30,7 +34,8 @@ function wuai_sluyu_service_meta($post) {
 add_action('save_post',function($id){
     if(!wp_verify_nonce(wuai_sluyu_input('wuai_service_meta_nonce'),'wuai_service_meta') || !current_user_can('edit_post',$id) || wp_is_post_revision($id) || (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE))return;
     if(isset($_POST['wuai_source_url']))update_post_meta($id,'_wuai_source_url',esc_url_raw(wuai_sluyu_input('wuai_source_url'),['http','https']));
-    $lock=wuai_sluyu_lock('poll_'.$id);
+    $managed=get_post_type($id)==='sluyu_topic' && function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id);
+    $lock=$managed?false:wuai_sluyu_lock('poll_'.$id);
     if($lock) {
         try {
             $tally=wuai_sluyu_poll_tally($id); $has_votes=$tally['voters']>0;

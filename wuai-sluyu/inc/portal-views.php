@@ -47,9 +47,10 @@ function wuai_sluyu_view_mission() {
     echo '<section class="sluyu-panel sluyu-mission-card"><p class="sluyu-eyebrow">A LITTLE EVERY DAY</p><h2>今天，也记得来打个招呼</h2><p>每日签到 +' . absint(wuai_sluyu_option('checkin_points',10)) . ' 积分，任务奖励另行领取。</p>';
     if ($uid) {
         $checked=get_user_meta($uid,'_wuai_sluyu_checkin_date',true)===$today;
-        echo '<div class="sluyu-stat-grid"><div><strong data-checkin-days>' . absint(get_user_meta($uid,'_wuai_sluyu_checkin_days',true)) . '</strong><span>累计签到</span></div><div><strong>' . absint(get_user_meta($uid,'_wuai_checkin_streak',true)) . '</strong><span>上次连续天数</span></div><div><strong>' . wuai_sluyu_points($uid) . '</strong><span>当前积分</span></div></div>';
-        wuai_sluyu_action_button('checkin', $checked?'今日已签到':'立即签到', [], $checked);
-        echo ' '; wuai_sluyu_action_button('makeup','补签缺失天数', ['confirm'=>'补签将扣除积分，确认继续？']);
+        $balance=wuai_sluyu_points_available($uid);
+        echo '<div class="sluyu-stat-grid"><div><strong data-checkin-days>' . absint(get_user_meta($uid,'_wuai_sluyu_checkin_days',true)) . '</strong><span>累计签到</span></div><div><strong>' . absint(get_user_meta($uid,'_wuai_checkin_streak',true)) . '</strong><span>上次连续天数</span></div><div><strong>' . esc_html(wuai_sluyu_points_label($balance)) . '</strong><span>当前积分</span></div></div>';
+        wuai_sluyu_action_button('checkin', $checked?'今日已签到':'立即签到', [], $checked || is_wp_error($balance));
+        echo ' '; wuai_sluyu_action_button('makeup','补签缺失天数', ['confirm'=>'补签将扣除积分，确认继续？'],is_wp_error($balance) || !function_exists('wuai_sluyu_economy_contract_ready') || !wuai_sluyu_economy_contract_ready());
         echo '<p class="sluyu-muted">最多补签最近 7 天，每缺失一天消耗 ' . absint(wuai_sluyu_option('makeup_points',30)) . ' 积分。请先补签，再进行今日签到。</p>';
         $month=wp_date('Y-m');
         $dates=$wpdb->get_col($wpdb->prepare('SELECT event_key FROM ' . wuai_sluyu_table('events') . " WHERE user_id=%d AND event_type='checkin' AND event_key LIKE %s",$uid,'checkin:'.$month.'%'));
@@ -77,13 +78,15 @@ function wuai_sluyu_view_task() {
 
 function wuai_sluyu_view_gold() {
     if (!wuai_sluyu_require_login()) { return; }
-    global $wpdb; $uid=get_current_user_id(); $page=wuai_sluyu_page_number();
-    echo '<section class="sluyu-panel"><p>可用积分</p><h2 class="sluyu-big-number">' . wuai_sluyu_points($uid) . '</h2><p>积分由签到和任务获得，可用于补签、明确标注的独立正文和下载解锁。积分不是现金，不支持提现或兑换承诺；每次扣分前请核对用途和价格。</p><a href="' . esc_url(wuai_sluyu_portal_url('orders')) . '">查看真实支付订单 →</a></section><section class="sluyu-panel"><h2>积分流水</h2><div class="sluyu-table-wrap"><table><thead><tr><th>时间</th><th>说明</th><th>积分变动</th></tr></thead><tbody>';
-    $events=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.wuai_sluyu_table('events').' WHERE user_id=%d AND points<>0 ORDER BY id DESC LIMIT 30 OFFSET %d',$uid,($page-1)*30));
-    foreach($events as $entry) { echo '<tr><td>' . esc_html($entry->created_at) . '</td><td>' . esc_html($entry->payload) . '</td><td>' . ($entry->points>0?'+':'') . (int)$entry->points . '</td></tr>'; }
-    echo '</tbody></table></div>'; if(!$events)wuai_sluyu_empty('暂无积分记录。');
-    $total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . wuai_sluyu_table('events') . ' WHERE user_id=%d AND points<>0',$uid));
-    wuai_sluyu_portal_pagination(ceil($total/30),'gold'); echo '</section>';
+    $uid=get_current_user_id(); $page=wuai_sluyu_page_number(); $balance=wuai_sluyu_points_available($uid);
+    $ledger=function_exists('wuai_sluyu_economy_ledger')?wuai_sluyu_economy_ledger($uid,$page,30):new WP_Error('economy_ledger','完整积分流水尚未就绪。');
+    echo '<section class="sluyu-panel"><p>可用积分</p><h2 class="sluyu-big-number">' . esc_html(wuai_sluyu_points_label($balance)) . '</h2><p>积分由签到、任务及已采纳悬赏回答获得，可用于补签、独立正文、下载解锁及非现金悬赏。预留后即减少可用积分，未发放的预留经核验退回；采纳时不会再次扣分。积分不是现金，不支持充值提现、转账兑换或收益承诺。</p><p>最少量数字悬赏分配凭证在账号或内容删除后仍保留，以保护其他账号余额。普通正文及下载解锁不提供自动退款。</p><a href="' . esc_url(wuai_sluyu_portal_url('orders')) . '">查看真实支付订单 →</a></section><section class="sluyu-panel"><h2>积分流水</h2>';
+    if(is_wp_error($balance))echo '<p class="sluyu-notice">'.esc_html($balance->get_error_message()).' 未核验的退回不视为已到账。</p>';
+    if(is_wp_error($ledger)) { wuai_sluyu_empty($ledger->get_error_message()); echo '</section>'; return; }
+    echo '<div class="sluyu-table-wrap"><table><thead><tr><th>时间</th><th>说明</th><th>积分变动</th></tr></thead><tbody>';
+    foreach($ledger['items'] as $entry) { echo '<tr data-ledger-key="'.esc_attr($entry['ledger_key']).'"><td>'.esc_html($entry['created_at']).'</td><td>'.esc_html($entry['payload']).'</td><td>'.((int)$entry['points']>0?'+':'').(int)$entry['points'].'</td></tr>'; }
+    echo '</tbody></table></div>'; if(!$ledger['items'])wuai_sluyu_empty('暂无积分记录。');
+    wuai_sluyu_portal_pagination(ceil($ledger['total']/30),'gold'); echo '</section>';
 }
 
 function wuai_sluyu_view_messages($key) { wuai_sluyu_view_messages_extended($key); }
@@ -109,6 +112,7 @@ function wuai_sluyu_view_submit() {
     if(!wuai_sluyu_require_login())return;
     if(wuai_sluyu_query('kind')==='listing') { wuai_sluyu_view_listing_submit(); return; }
     if(wuai_sluyu_query('kind')==='guess') { wuai_sluyu_view_guess_submit(); return; }
+    if(wuai_sluyu_query('kind')==='bounty') { if(function_exists('wuai_sluyu_view_bounty_submit'))wuai_sluyu_view_bounty_submit(); else wuai_sluyu_empty('非现金积分悬赏尚未就绪。'); return; }
     $requested_group=wuai_sluyu_query('group','0');
     $invalid_group=(isset($_GET['group']) && !is_scalar($_GET['group'])) || (!isset($_GET['group']) && isset($_GET['circle_id']) && !is_scalar($_GET['circle_id']));
     if ($invalid_group || !preg_match('/^(?:0|[1-9][0-9]{0,9})$/D',$requested_group) || ((int)$requested_group && !wuai_sluyu_circle_can_post((int)$requested_group,get_current_user_id()))) {
@@ -118,6 +122,7 @@ function wuai_sluyu_view_submit() {
     echo '<section class="sluyu-panel"><h2>每一份分享，都值得认真对待</h2><p>发布内容需经管理员审核。请确认拥有分享权限，不发布个人隐私、侵权或违法内容。</p>';
     echo '<p><a href="' . esc_url(wuai_sluyu_portal_url('submit',['kind'=>'listing'])) . '">发布供求信息 →</a></p>';
     echo '<p><a href="'.esc_url(wuai_sluyu_portal_url('submit',['kind'=>'guess','group'=>(int)$requested_group])).'">发布猜答案互动题 →</a></p>';
+    if(function_exists('wuai_sluyu_bounty_enabled') && wuai_sluyu_bounty_enabled())echo '<p><a href="'.esc_url(wuai_sluyu_portal_url('submit',['kind'=>'bounty','group'=>(int)$requested_group])).'">发起非现金积分悬赏 →</a></p>';
     wuai_sluyu_form_start('submit'); $selected=sanitize_key(wuai_sluyu_query('kind','topic'));
     echo '<label>发布类型<select name="kind">';
     foreach(['topic'=>'日常话题','question'=>'提问','poll'=>'投票','post'=>'文章投稿','news'=>'快讯爆料','link'=>'网址入驻','ticket'=>'工单 / 资源反馈'] as $value=>$label) { echo '<option value="' . esc_attr($value) . '" ' . selected($value,$selected,false) . '>' . esc_html($label) . '</option>'; }
@@ -151,7 +156,7 @@ function wuai_sluyu_view_feed($key) {
     echo '</div><div class="sluyu-filter-tabs"><a href="' . esc_url(wuai_sluyu_portal_url($key)) . '">全部</a>';
     if($key==='circle')echo '<a href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">圈子广场 / 创建圈子</a>';
     $terms=get_terms(['taxonomy'=>$config[1],'hide_empty'=>false]); if(!is_wp_error($terms))foreach($terms as $term)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['group'=>$term->term_id])) . '">' . esc_html($term->name) . '</a>';
-    if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票','guess'=>'猜答案'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value,'group'=>$group])) . '">' . $label . '</a>';
+    if($key==='circle')foreach(['topic'=>'日常','question'=>'提问','poll'=>'投票','guess'=>'猜答案','bounty'=>'积分悬赏'] as $value=>$label)echo '<a href="' . esc_url(wuai_sluyu_portal_url($key,['kind'=>$value,'group'=>$group])) . '">' . $label . '</a>';
     echo '</div>';
     if($key==='circle') {
         $sort=wuai_sluyu_query('sort','latest');
@@ -210,7 +215,7 @@ function wuai_sluyu_topic_content($content) {
     if(!is_singular(['sluyu_topic','sluyu_news','sluyu_link']) || !in_the_loop() || !is_main_query() || post_password_required())return $content;
     $id=get_the_ID(); $kind=get_post_meta($id,'_wuai_topic_kind',true); ob_start();
     if($kind==='poll') { wuai_sluyu_poll_view($id); }
-    if($kind==='question') { $accepted=absint(get_post_meta($id,'_wuai_accepted_comment',true)); $answer=$accepted?get_comment($accepted):null; if($answer && $answer->comment_approved==='1' && (int)$answer->comment_post_ID===$id)echo '<section class="sluyu-notice"><h3>已采纳的回答</h3><p>' . nl2br(esc_html($answer->comment_content)) . '</p></section>'; }
+    if($kind==='question' && !(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id))) { $accepted=absint(get_post_meta($id,'_wuai_accepted_comment',true)); $answer=$accepted?get_comment($accepted):null; if($answer && $answer->comment_approved==='1' && (int)$answer->comment_post_ID===$id)echo '<section class="sluyu-notice"><h3>已采纳的回答</h3><p>' . nl2br(esc_html($answer->comment_content)) . '</p></section>'; }
     $source=get_post_meta($id,'_wuai_source_url',true); if($source)echo '<p><a href="' . esc_url($source) . '" target="_blank" rel="nofollow noopener noreferrer">查看来源 / 访问网站 ↗</a></p>';
     return $content . ob_get_clean();
 }

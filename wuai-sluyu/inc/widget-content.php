@@ -30,7 +30,7 @@ function wuai_sluyu_extended_widget($mode,$count,$instance,$args) {
             echo '</div>';
         } else {
             $user=wp_get_current_user();
-            echo '<div class="sluyu-profile-heading">'.get_avatar($uid,44).'<a href="'.esc_url(wuai_sluyu_portal_url('account')).'">'.esc_html($user->display_name).'</a></div><div class="sluyu-stat-grid"><div><strong>'.wuai_sluyu_points($uid).'</strong><span>我的积分</span></div><div><strong>'.wuai_sluyu_message_unread($uid).'</strong><span>未读私信</span></div></div><p>'.(wuai_sluyu_banned($uid)?'账号暂不能参与互动':(wuai_sluyu_member($uid)?'会员当前有效':'普通社区账号')).'</p><div class="sluyu-button-row"><a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('account')).'">个人中心</a><a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('directmessage')).'">查看私信</a></div>';
+            echo '<div class="sluyu-profile-heading">'.get_avatar($uid,44).'<a href="'.esc_url(wuai_sluyu_portal_url('account')).'">'.esc_html($user->display_name).'</a></div><div class="sluyu-stat-grid"><div><strong>'.esc_html(wuai_sluyu_points_label(wuai_sluyu_points_available($uid))).'</strong><span>我的积分</span></div><div><strong>'.wuai_sluyu_message_unread($uid).'</strong><span>未读私信</span></div></div><p>'.(wuai_sluyu_banned($uid)?'账号暂不能参与互动':(wuai_sluyu_member($uid)?'会员当前有效':'普通社区账号')).'</p><div class="sluyu-button-row"><a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('account')).'">个人中心</a><a class="sluyu-action-plain" href="'.esc_url(wuai_sluyu_portal_url('directmessage')).'">查看私信</a></div>';
         }
     } elseif($mode==='toc' || $mode==='download') {
         $id=is_singular(['post','page','sluyu_topic']) && !wuai_sluyu_portal_key()?get_queried_object_id():0;

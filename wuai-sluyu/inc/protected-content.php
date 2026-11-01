@@ -117,12 +117,24 @@ function wuai_sluyu_protected_post_lock($post_id) {
 function wuai_sluyu_protected_unlock($post_id, $quote, $confirmed, $user_locked = false) {
     $uid = get_current_user_id(); $post_id = absint($post_id);
     if (!$uid || !$post_id || !get_userdata($uid) || wuai_sluyu_banned($uid)) { return new WP_Error('protected_auth', '请使用有效的登录账号解锁。'); }
-    // Lock order is always user -> post. The internal dispatcher alone inherits
-    // the user's core AJAX lock; admin configuration takes only the post lock.
-    $user_lock = $user_locked ? false : wuai_sluyu_lock('user_' . $uid);
-    if (!$user_locked && !$user_lock) { return new WP_Error('protected_busy', '账户正在处理其他操作，请稍后重试。'); }
+    // A direct helper call must not silently join a caller-held account lock.
+    // The community dispatcher explicitly passes $user_locked=true after it
+    // has acquired the account lock itself; all other callers must observe a
+    // busy lock rather than re-entering the protected spend path. This keeps
+    // lock ownership explicit and prevents a failed assertion/exception from
+    // leaving a durable user lock behind during cleanup.
+    if (!$user_locked) {
+        $lock_name = 'wuai_lock_user_' . absint($uid);
+        if (!empty($GLOBALS['wuai_sluyu_request_locks'][$lock_name])) {
+            return new WP_Error('protected_busy', '账号正在执行其他积分操作，请稍后重试。');
+        }
+    }
+    // Expiry reconciliation precedes the content lock: user -> economy -> post.
+    $guard = wuai_sluyu_points_operation_enter($uid, 'protected_unlock');
+    if (is_wp_error($guard)) { return $guard; }
     $post_lock = false;
     try {
+        $settled = wuai_sluyu_bounty_due_for_user($uid); if (is_wp_error($settled)) { return $settled; }
         $post_lock = wuai_sluyu_protected_post_lock($post_id);
         if (!$post_lock) { return new WP_Error('protected_busy', '内容正在更新，请刷新后重试。'); }
         clean_user_cache($uid);
@@ -137,15 +149,14 @@ function wuai_sluyu_protected_unlock($post_id, $quote, $confirmed, $user_locked 
             return new WP_Error('protected_confirm', '请重新核对标题、积分价格并确认；内容或价格可能已更新。');
         }
         $balance = wuai_sluyu_points($uid);
+        if (is_wp_error($balance)) { return $balance; }
         if ($balance < $config['cost']) { return new WP_Error('protected_points', '积分不足，当前内容需要 ' . $config['cost'] . ' 积分。'); }
         // One unique ledger row is both the debit and entitlement; no second grant can fail.
-        $saved = wuai_sluyu_event($uid, wuai_sluyu_protected_event_key($post_id, $config), 'unlock', -$config['cost'], $post_id, '解锁受保护正文：' . sanitize_text_field($post->post_title));
-        if (!$saved) {
-            if (wuai_sluyu_protected_purchased($post_id, $uid, $config)) { return ['message'=>'当前版本已解锁，不会重复扣分。','reload'=>true,'charged'=>0]; }
-            return new WP_Error('protected_storage', '解锁未完成，请刷新核对积分后重试。');
-        }
-        return ['message'=>'已扣除 ' . $config['cost'] . ' 积分并解锁当前版本。','reload'=>true,'charged'=>$config['cost'],'points'=>$balance - $config['cost']];
-    } finally { wuai_sluyu_unlock($post_lock); wuai_sluyu_unlock($user_lock); }
+        $saved = wuai_sluyu_economy_event($uid, wuai_sluyu_protected_event_key($post_id, $config), 'unlock', -$config['cost'], $post_id, '解锁受保护正文：' . sanitize_text_field($post->post_title));
+        if (is_wp_error($saved)) { return $saved; }
+        $after = wuai_sluyu_points($uid);
+        return ['message'=>$saved['created'] ? '已扣除 ' . $config['cost'] . ' 积分并解锁当前版本。' : '已核验当前版本解锁凭证，本次未确认新增扣分。','reload'=>true,'charged'=>$saved['created'] ? $config['cost'] : 0,'points'=>is_wp_error($after) ? null : $after];
+    } finally { wuai_sluyu_unlock($post_lock); wuai_sluyu_points_operation_leave($guard); }
 }
 
 add_filter('wuai_sluyu_community_dispatch', function ($result, $operation, $uid) {
@@ -270,7 +281,9 @@ function wuai_sluyu_protected_view($post_id, $allow_preview = false) {
     elseif ($state['reason'] === 'circle') { $html .= '<a class="sluyu-action-plain" href="' . esc_url(wuai_sluyu_portal_url('circles')) . '">查看圈子目录</a>'; }
     elseif ($state['reason'] === 'points') {
         $quote = wuai_sluyu_protected_quote($post_id);
-        $html .= '<div class="sluyu-notice"><p>内容：<strong>' . esc_html($post->post_title) . '</strong></p><p>本次需要 <strong>' . absint($state['cost']) . ' 积分</strong>，当前余额 ' . wuai_sluyu_points(get_current_user_id()) . ' 积分。请核对内容与价格；没有确认不会扣分。</p><p>管理员可因审核、版权或维护撤稿，不保证内容永久在线。积分不是现金，当前没有自动退款流程；有争议请提交工单。</p></div><form class="sluyu-community-form" data-operation="protected_unlock"><div class="sluyu-form-status" role="status" aria-live="polite"></div><input type="hidden" name="id" value="' . absint($post_id) . '"><input type="hidden" name="quote" value="' . esc_attr($quote) . '"><label><span><input type="checkbox" name="confirm_unlock" value="1" required style="width:auto"> 我确认用 ' . absint($state['cost']) . ' 积分解锁此内容当前版本</span></label><button type="submit" class="sluyu-action-primary">确认扣除积分并解锁</button></form>';
+        $balance = wuai_sluyu_points_available(get_current_user_id());
+        if (is_wp_error($balance) || !wuai_sluyu_economy_contract_ready()) { return $html . '<p class="sluyu-notice">完整积分暂不可核验或支出尚未开放，不会扣分。已有解锁凭证不受影响，请稍后重试。</p></section>'; }
+        $html .= '<div class="sluyu-notice"><p>内容：<strong>' . esc_html($post->post_title) . '</strong></p><p>本次需要 <strong>' . absint($state['cost']) . ' 积分</strong>，当前余额 ' . esc_html($balance) . ' 积分。请核对内容与价格；没有确认不会扣分。</p><p>管理员可因审核、版权或维护撤稿，不保证内容永久在线。积分不是现金，当前没有自动退款流程；有争议请提交工单。</p></div><form class="sluyu-community-form" data-operation="protected_unlock"><div class="sluyu-form-status" role="status" aria-live="polite"></div><input type="hidden" name="id" value="' . absint($post_id) . '"><input type="hidden" name="quote" value="' . esc_attr($quote) . '"><label><span><input type="checkbox" name="confirm_unlock" value="1" required style="width:auto"> 我确认用 ' . absint($state['cost']) . ' 积分解锁此内容当前版本</span></label><button type="submit" class="sluyu-action-primary">确认扣除积分并解锁</button></form>';
     }
     return $html . '<p class="sluyu-muted">只保护此独立正文片段，不隐藏公开摘要、评论，也不保证外部链接或附件直链不可访问。</p></section>';
 }

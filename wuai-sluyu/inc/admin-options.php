@@ -416,4 +416,3 @@ add_action('csf_enqueue', function () {
     wp_enqueue_script('wuai-sluyu-updater', WUAI_SLUYU_URI . '/assets/js/admin-updater.js', ['jquery', 'wuai-sluyu-admin'], WUAI_SLUYU_VERSION, true);
     wp_localize_script('wuai-sluyu-updater', 'wuaiUpdater', ['ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('wuai_sluyu_update')]);
 });
-

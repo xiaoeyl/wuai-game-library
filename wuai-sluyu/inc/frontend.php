@@ -146,7 +146,8 @@ function wuai_sluyu_comment($comment, $args, $depth) {
             <div class="sluyu-comment-detail"><div class="sluyu-comment-byline"><strong><?php comment_author_link(); ?></strong><time datetime="<?php echo esc_attr(get_comment_date('c')); ?>"><?php echo esc_html(get_comment_date('Y-m-d H:i')); ?></time></div>
             <?php if ($comment->comment_approved === '0') : ?><p class="sluyu-comment-pending">你的评论正在等待审核。</p><?php endif; ?>
             <div class="sluyu-comment-text"><?php comment_text(); ?></div>
-            <?php $topic = get_post($comment->comment_post_ID); if ($topic && get_post_meta($topic->ID, '_wuai_topic_kind', true) === 'question' && is_user_logged_in() && ((int)$topic->post_author === get_current_user_id() || current_user_can('moderate_comments')) && $comment->comment_approved === '1') { wuai_sluyu_action_button('accept', '采纳回答', ['id'=>$comment->comment_ID]); } ?>
+            <?php do_action('wuai_sluyu_comment_actions', $comment); ?>
+            <?php $topic = get_post($comment->comment_post_ID); if ($topic && get_post_meta($topic->ID, '_wuai_topic_kind', true) === 'question' && !(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($topic->ID)) && is_user_logged_in() && ((int)$topic->post_author === get_current_user_id() || current_user_can('moderate_comments')) && $comment->comment_approved === '1') { wuai_sluyu_action_button('accept', '采纳回答', ['id'=>$comment->comment_ID]); } ?>
             <?php comment_reply_link(array_merge($args, ['depth' => $depth, 'max_depth' => $args['max_depth'], 'reply_text' => '回复', 'before' => '<div class="sluyu-comment-reply">', 'after' => '</div>'])); ?>
             </div>
         </div>

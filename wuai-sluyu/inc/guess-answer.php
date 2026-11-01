@@ -236,7 +236,7 @@ add_action('save_post',function($id){
 },60);
 add_action('admin_notices',function(){if(!current_user_can('edit_others_posts'))return;$key='wuai_guess_notice_'.get_current_user_id();$message=get_transient($key);if($message){delete_transient($key);echo '<div class="notice notice-error"><p>猜答案设置：'.esc_html($message).'</p></div>';}});
 
-add_action('deleted_post',function($id){global $wpdb;delete_metadata('user',0,'_wuai_guess_attempts_'.absint($id),'',true);$wpdb->delete(wuai_sluyu_table('events'),['event_type'=>'guess','target_id'=>absint($id)]);});
+add_action('deleted_post',function($id){global $wpdb;delete_metadata('user',0,'_wuai_guess_attempts_'.absint($id),'',true);$wpdb->delete(wuai_sluyu_table('events'),['event_type'=>'guess','target_id'=>absint($id),'points'=>0]);});
 add_filter('wp_privacy_personal_data_exporters',function($exporters){$exporters['wuai-guesses']=['exporter_friendly_name'=>'猜答案尝试记录','callback'=>'wuai_sluyu_guess_export'];return $exporters;});
 function wuai_sluyu_guess_export($email,$page=1) {
     $user=get_user_by('email',$email);if(!$user)return ['data'=>[],'done'=>true];

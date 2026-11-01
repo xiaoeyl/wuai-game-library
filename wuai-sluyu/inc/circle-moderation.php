@@ -35,6 +35,7 @@ function wuai_sluyu_circle_review_permission($id,$group,$uid=null) {
     return true;
 }
 function wuai_sluyu_circle_review_private($id) {
+    if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id))return true;
     foreach(['_wuai_protected_content','_wuai_guess_config','_wuai_download_settings','_wuai_sluyu_download_url'] as $key)if(metadata_exists('post',$id,$key))return true;
     return get_post_meta($id,'_wuai_topic_kind',true)==='guess';
 }
@@ -54,6 +55,8 @@ function wuai_sluyu_circle_review_poll_valid($id) {
     return $closed==='' || in_array($closed,['0','1',0,1],true);
 }
 function wuai_sluyu_circle_review_config_valid($id) {
+    // Even an altered topic kind cannot move economic review into this queue.
+    if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id))return false;
     $kind=get_post_meta($id,'_wuai_topic_kind',true);
     if(!in_array($kind,['','topic','question','poll','guess'],true))return false;
     if($kind==='poll' && !wuai_sluyu_circle_review_poll_valid($id))return false;
@@ -130,6 +133,7 @@ function wuai_sluyu_circle_review_notify($id,$entry) {
 function wuai_sluyu_circle_review($id,$group,$decision,$reason,$stamp,$user_locked=false) {
     $uid=get_current_user_id(); $id=absint($id); $group=absint($group);
     if(!$uid || !get_userdata($uid) || wuai_sluyu_banned($uid))return new WP_Error('circle_review_auth','请使用正常状态的账号登录。');
+    if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id))return new WP_Error('circle_review_economy','积分悬赏必须由站点管理员审核内容及独立预留记录；圈主审核不发布、撤回或结算悬赏。');
     if(!in_array($decision,['approve','reject','recover'],true) || !is_string($reason) || !is_string($stamp) || !preg_match('/^[a-f0-9]{64}$/D',$stamp))return new WP_Error('circle_review_input','审核字段无效，请刷新页面。');
     $reason=sanitize_textarea_field($reason);
     if(mb_strlen($reason)>500 || (in_array($decision,['reject','recover'],true) && mb_strlen(trim($reason))<5))return new WP_Error('circle_review_reason','退回或恢复说明至少 5 字，审核说明最多 500 字。');
@@ -265,7 +269,7 @@ function wuai_sluyu_circle_feed_query_args($group=0,$kind='',$sort='latest',$pag
     $group=absint($group); $sort=in_array($sort,['latest','featured','likes','comments'],true)?$sort:'latest';
     $args=['post_type'=>'sluyu_topic','post_status'=>'publish','has_password'=>false,'posts_per_page'=>12,'paged'=>max(1,min(100000,absint($page))),'orderby'=>['date'=>'DESC','ID'=>'DESC'],'ignore_sticky_posts'=>true,'suppress_filters'=>false,'wuai_circle_feed_sort'=>$sort,'wuai_circle_feed_group'=>$group];
     if($group) { if(!wuai_sluyu_circle($group))$args['post__in']=[0]; else $args['tax_query']=[['taxonomy'=>'sluyu_circle','terms'=>[$group],'include_children'=>false]]; }
-    if(in_array($kind,['topic','question','poll','guess'],true))$args['meta_query']=[['key'=>'_wuai_topic_kind','value'=>$kind]];
+    if(in_array($kind,['topic','question','poll','guess','bounty'],true))$args['meta_query']=[['key'=>'_wuai_topic_kind','value'=>$kind]];
     if($sort==='comments')$args['orderby']=['comment_count'=>'DESC','date'=>'DESC','ID'=>'DESC'];
     if(in_array($sort,['likes','featured'],true))$args['cache_results']=false;
     if($sort==='featured' && !$group) {
@@ -396,6 +400,7 @@ function wuai_sluyu_view_circle_topics() {
         $held=wuai_sluyu_circle_review_held($post->ID);
         echo '<article class="sluyu-panel sluyu-circle-review-item"><h3>'.esc_html($post->post_title).'</h3><p class="sluyu-muted">稿件 #'.absint($post->ID).' · '.esc_html(get_the_author_meta('display_name',$post->post_author)).'</p><div class="sluyu-entry">'.wpautop(esc_html(wp_strip_all_tags($post->post_content))).'</div>';
         if(wuai_sluyu_circle_review_editor($uid) && user_can($uid,'edit_post',$post->ID))echo '<p><a href="'.esc_url(get_edit_post_link($post->ID,'raw')).'">进入后台核对完整配置与私有片段</a></p>';
+        if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($post->ID)) { echo '<p class="sluyu-notice">此稿件有积分分配保护，请站点管理员使用原生内容审核及独立悬赏审核。圈主不能激活奖励或变更条款。</p></article>'; continue; }
         if(get_post_meta($post->ID,'_wuai_topic_kind',true)==='poll' && wuai_sluyu_circle_review_poll_valid($post->ID)) {
             $poll=wuai_sluyu_poll($post->ID); echo '<div class="sluyu-notice"><strong>公开投票选项</strong><ol>';
             foreach($poll['choices'] as $choice)echo '<li>'.esc_html($choice).'</li>';

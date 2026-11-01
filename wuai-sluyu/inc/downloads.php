@@ -66,9 +66,10 @@ function wuai_sluyu_download_quote($post_id) {
 function wuai_sluyu_download_unlock($post_id,$quote,$confirmed,$user_locked=false) {
     $uid=get_current_user_id(); $post_id=absint($post_id);
     if (!$uid || wuai_sluyu_banned($uid)) { return new WP_Error('download_auth','请使用正常状态的账号登录。'); }
-    $user_lock=$user_locked?false:wuai_sluyu_lock('user_'.$uid); $post_lock=false;
-    if (!$user_locked && !$user_lock) { return new WP_Error('download_busy','账户正在处理其他操作。'); }
+    $guard=wuai_sluyu_points_operation_enter($uid,'download_unlock'); $post_lock=false;
+    if (is_wp_error($guard)) { return $guard; }
     try {
+        $settled=wuai_sluyu_bounty_due_for_user($uid); if(is_wp_error($settled))return $settled;
         $post_lock=wuai_sluyu_protected_post_lock($post_id);
         if (!$post_lock) { return new WP_Error('download_busy','资源正在更新，请刷新后重试。'); }
         clean_post_cache($post_id); wp_cache_delete($uid,'user_meta');
@@ -78,10 +79,13 @@ function wuai_sluyu_download_unlock($post_id,$quote,$confirmed,$user_locked=fals
         if (wuai_sluyu_download_access($post_id)) { return ['message'=>'已具有下载权限，不会重复扣分。','charged'=>0,'reload'=>true]; }
         if ($confirmed!=='1' || !is_string($quote) || !preg_match('/^[a-f0-9]{64}$/',$quote) || !hash_equals(wuai_sluyu_download_quote($post_id),$quote)) { return new WP_Error('download_confirm','请刷新页面重新核对资源名称与积分价格，并明确确认。'); }
         $balance=wuai_sluyu_points($uid);
+        if(is_wp_error($balance))return $balance;
         if ($balance<$config['cost']) { return new WP_Error('download_points','积分不足，本资源需要 '.$config['cost'].' 积分。'); }
-        if (!wuai_sluyu_event($uid,'resource_unlock:'.$post_id.':'.$config['version'],'download_unlock',-$config['cost'],$post_id,'解锁下载：'.sanitize_text_field($post->post_title))) { return new WP_Error('download_storage','解锁未完成，请刷新核对积分后重试。'); }
-        return ['message'=>'已扣除 '.$config['cost'].' 积分并解锁当前下载版本。','charged'=>$config['cost'],'reload'=>true];
-    } finally { wuai_sluyu_unlock($post_lock); wuai_sluyu_unlock($user_lock); }
+        $saved=wuai_sluyu_economy_event($uid,'resource_unlock:'.$post_id.':'.$config['version'],'download_unlock',-$config['cost'],$post_id,'解锁下载：'.sanitize_text_field($post->post_title));
+        if(is_wp_error($saved))return $saved;
+        $after=wuai_sluyu_points($uid);
+        return ['message'=>$saved['created']?'已扣除 '.$config['cost'].' 积分并解锁当前下载版本。':'已核验当前版本下载凭证，本次未确认新增扣分。','charged'=>$saved['created']?$config['cost']:0,'points'=>is_wp_error($after)?null:$after,'reload'=>true];
+    } finally { wuai_sluyu_unlock($post_lock); wuai_sluyu_points_operation_leave($guard); }
 }
 add_filter('wuai_sluyu_community_dispatch',function($result,$operation,$uid){
     if ($result!==null || $operation!=='download_unlock') { return $result; }
@@ -125,8 +129,10 @@ function wuai_sluyu_download_gate($post_id,$compact=false,$instance_id='') {
     elseif ($mode==='comment') { echo '<a class="sluyu-action-primary" href="#comments">前往评论</a>'; }
     elseif ($mode==='circle') { echo '<a class="sluyu-action-primary" href="'.esc_url(wuai_sluyu_portal_url('circles')).'">查看圈子</a>'; }
     elseif ($mode==='points' && $uid && get_post_status($post_id)==='publish') {
-        echo '<p>资源：'.esc_html(get_the_title($post_id)).'<br>需要 '.$config['cost'].' 积分，余额 '.wuai_sluyu_points($uid).' 积分。</p>';
-        if ($compact) { echo '<a class="sluyu-action-plain" href="#download-box">前往正文核对并解锁</a>'; }
+        $balance=wuai_sluyu_points_available($uid);
+        echo '<p>资源：'.esc_html(get_the_title($post_id)).'<br>需要 '.$config['cost'].' 积分；当前余额：'.esc_html(wuai_sluyu_points_label($balance)).'。</p>';
+        if(is_wp_error($balance) || !wuai_sluyu_economy_contract_ready()) { echo '<p class="sluyu-notice">完整积分暂不可核验或支出尚未开放，不会扣分，请稍后重试。</p>'; }
+        elseif ($compact) { echo '<a class="sluyu-action-plain" href="#download-box">前往正文核对并解锁</a>'; }
         else { wuai_sluyu_form_start('download_unlock'); echo '<input name="id" type="hidden" value="'.absint($post_id).'"><input name="quote" type="hidden" value="'.esc_attr(wuai_sluyu_download_quote($post_id)).'"><label><span><input type="checkbox" name="confirm_unlock" value="1" required style="width:auto"> 我确认扣除 '.$config['cost'].' 积分解锁当前下载版本</span></label>'; wuai_sluyu_form_end('确认积分解锁'); }
     }
     echo '<p class="sluyu-muted">只控制本站下载卡片和跳转入口。外部网盘、已经复制的链接和第三方缓存不受本站控制；资源可能由发布者撤回。正文片段与下载权限独立计费，请分别核对。</p></section>';
