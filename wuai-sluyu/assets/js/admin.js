@@ -2,10 +2,29 @@
  * the menu and sticky-footer handlers in the supplied Zibll settings script. */
 (function ($) {
     'use strict';
+    function migrateTab() {
+        if (!window.wuaiCsf || !$('.wuai-csf-settings').length) return;
+        var tab = window.location.hash.replace(/^#tab=/, '');
+        if (!tab) return;
+        try { tab = encodeURI(decodeURIComponent(tab).replace(/&/g, '').replace(/ /g, '-')); } catch (e) { tab = ''; }
+        tab = tab.replace(/%[a-f0-9]{2}/gi, function (value) { return value.toLowerCase(); });
+        tab = wuaiCsf.legacyTabs[tab] || tab;
+        var known = $('.wuai-csf-settings [data-tab-id]').filter(function () { return $(this).attr('data-tab-id') === tab; }).length;
+        var hash = '#tab=' + (known ? tab : wuaiCsf.defaultTab);
+        if (hash !== window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search + hash);
+        }
+    }
+    // Normalize old bookmarks before CSF's DOM-ready handler selects its first tab.
+    migrateTab();
     $(function () {
         var $panel = $('.wuai-csf-settings');
         if (!$panel.length) return;
         var $nav = $panel.find('.csf-nav-options');
+        $(window).on('hashchange.wuaiCsf', function () {
+            migrateTab();
+            $(window).trigger('csf.hashchange');
+        });
         function closeMenu() {
             $nav.removeClass('show');
             $panel.find('.csf-menu').attr('aria-expanded', 'false');
@@ -15,7 +34,14 @@
         }
         $(window).on('scroll.wuaiCsf resize.wuaiCsf', updateSticky);
         updateSticky();
-        $panel.find('.csf-menu').attr({ role: 'button', 'aria-expanded': 'false', 'aria-label': '切换设置菜单' });
+        $nav.attr('id', 'wuai-settings-navigation');
+        $panel.find('.csf-menu').attr({ role: 'button', tabindex: '0', 'aria-expanded': 'false', 'aria-controls': 'wuai-settings-navigation', 'aria-label': '切换设置菜单' });
+        $panel.on('keydown', '.csf-menu', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                $(this).trigger('click');
+            }
+        });
         $panel.on('click', '.csf-menu', function (event) {
             event.preventDefault();
             $nav.toggleClass('show');

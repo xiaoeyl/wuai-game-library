@@ -3,11 +3,12 @@
 if (!defined('ABSPATH') || !defined('WP_HTTP_BLOCK_EXTERNAL') || !WP_HTTP_BLOCK_EXTERNAL || !preg_match('~^http://(127\.0\.0\.1|localhost)(:\d+)?$~', WP_HOME)) {
     return;
 }
+add_filter('pre_wp_mail', '__return_true', PHP_INT_MAX);
 
 function wuai_qa_release($version) {
     $mode = get_option('wuai_qa_update_mode', 'current');
     $root = dirname(__DIR__) . '/qa-update';
-    $package = $root . '/' . (in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'requirements'], true) ? $mode : 'valid') . '.zip';
+    $package = $root . '/' . (in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'requirements'], true) ? $mode : 'valid') . '.zip';
     return [
         'tag_name' => 'v' . $version, 'draft' => false, 'prerelease' => strpos($version, '-') !== false,
         'body' => "## 测试版本\n\n- 页内检测、更新日志\n- 彩色进度与真实主题安装\n<script>window.unsafeRelease=true</script>",
@@ -33,7 +34,7 @@ add_filter('pre_http_request', function ($pre, $args, $url) {
     if (strpos($url, 'https://github.com/xiaoeyl/wuai-game-library/releases/download/') === 0) {
         if ($mode === 'download-fail') return new WP_Error('http_request_failed', 'QA download failed');
         if ($mode === 'slow') sleep(6);
-        $kind = in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'requirements'], true) ? $mode : 'valid';
+        $kind = in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'requirements'], true) ? $mode : 'valid';
         $file = dirname(__DIR__) . '/qa-update/' . $kind . '.zip';
         if (!empty($args['stream'])) copy($file, $args['filename']);
         return ['response' => ['code' => 200, 'message' => 'OK'], 'headers' => [], 'body' => '', 'cookies' => []];

@@ -6,7 +6,7 @@ function wuai_sluyu_services_admin() {
     if(!current_user_can('manage_options'))return;
     echo '<div class="wrap"><h1>站内服务管理</h1><p>服务页面开箱可访问；需要在“页面”和“菜单”中编辑时可初始化。不会覆盖已有页面、文章、分类或主题设置。</p>';
     if(isset($_GET['created']))echo '<div class="notice notice-success"><p>缺失的服务页面与分类已创建，原有内容保持不变。</p></div>';
-    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="wuai_sluyu_install_pages">'; wp_nonce_field('wuai_sluyu_install_pages'); submit_button('创建缺失的页面与分类','primary','submit',false); echo '</form><h2>功能配置</h2><p>签到积分、公开优惠码和会员商品 ID 在“主题设置 → 社区与商城”配置。</p><table class="widefat striped"><thead><tr><th>模块</th><th>管理入口 / 状态</th></tr></thead><tbody>';
+    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="wuai_sluyu_install_pages">'; wp_nonce_field('wuai_sluyu_install_pages'); submit_button('创建缺失的页面与分类','primary','submit',false); echo '</form><h2>功能配置</h2><p>签到积分、补签费用在“主题设置 → 用户&互动 → 积分与签到”配置；公开优惠码和会员商品 ID 在“商城&商品 → 会员与优惠”配置。</p><table class="widefat striped"><thead><tr><th>模块</th><th>管理入口 / 状态</th></tr></thead><tbody>';
     foreach(['sluyu_topic'=>'茶话会与投票','sluyu_news'=>'解忧资讯','sluyu_link'=>'网址导航','sluyu_doc'=>'帮助文档','sluyu_listing'=>'供求信息','sluyu_verify'=>'认证申请','sluyu_ticket'=>'工单与举报'] as $type=>$label)echo '<tr><td>' . esc_html($label) . '</td><td><a href="' . esc_url(admin_url('edit.php?post_type='.$type)) . '">管理内容与审核</a></td></tr>';
     echo '<tr><td>独立隐藏正文 / 下载权限</td><td>文章、页面或话题编辑中的对应信息框；正文与下载独立授权，请明确说明价格和用途。</td></tr><tr><td>一次性邀请码</td><td><a href="'.esc_url(admin_url('admin.php?page=wuai-sluyu-invitations')).'">启用方式、生成与挂起记录核验</a>；默认关闭，仅覆盖原生 WordPress 注册。</td></tr>';
     echo '<tr><td>圈子与创建申请</td><td><a href="' . esc_url(admin_url('edit-tags.php?taxonomy=sluyu_circle&post_type=sluyu_topic')) . '">管理分组、圈主和审核状态</a></td></tr><tr><td>拖放小工具</td><td><a href="' . esc_url(admin_url('widgets.php')) . '">外观 → 小工具</a></td></tr><tr><td>商城与支付</td><td>' . (class_exists('WooCommerce')?'WooCommerce 已启用，请配置支付网关并完成沙盒测试。':'需要安装 WooCommerce；未安装时不显示虚假交易。') . '</td></tr></tbody></table><h2>页面目录</h2><ul>';
@@ -21,6 +21,10 @@ function wuai_sluyu_service_meta($post) {
     if(in_array($post->post_type,['sluyu_news','sluyu_link'],true))echo '<p><label>来源 / 站点网址 <input class="widefat" type="url" name="wuai_source_url" value="' . esc_attr(get_post_meta($post->ID,'_wuai_source_url',true)) . '"></label></p>';
     if($post->post_type==='sluyu_topic') {
         $current_kind=get_post_meta($post->ID,'_wuai_topic_kind',true);
+        if(function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($post->ID)) {
+            echo '<p><label>话题类型 <select name="wuai_topic_kind" disabled><option value="topic" selected>公开图片话题（类型锁定）</option></select></label></p><p>请核验专用图片后手动发布。图片从上传时即公开，不支持题型转换、受保护正文、下载配置或迁移圈子；作者使用专用图片编辑器修改后重新送审。</p>';
+            return;
+        }
         if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($post->ID)) {
             echo '<p><label>话题类型 <select name="wuai_topic_kind" disabled><option value="'.esc_attr(is_string($current_kind)?$current_kind:'').'" selected>非现金积分悬赏 / 记账保护（类型锁定）</option></select></label></p><p>类型及预留条款不通过普通服务信息表单修改。原生发布只审核公开内容，不激活奖励；请使用独立积分审核页。已有分配记录在题型损坏或功能关闭时仍受保护。</p>';
             return;
@@ -33,6 +37,7 @@ function wuai_sluyu_service_meta($post) {
 }
 add_action('save_post',function($id){
     if(!wp_verify_nonce(wuai_sluyu_input('wuai_service_meta_nonce'),'wuai_service_meta') || !current_user_can('edit_post',$id) || wp_is_post_revision($id) || (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE))return;
+    if(function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($id))return;
     if(isset($_POST['wuai_source_url']))update_post_meta($id,'_wuai_source_url',esc_url_raw(wuai_sluyu_input('wuai_source_url'),['http','https']));
     $managed=get_post_type($id)==='sluyu_topic' && function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id);
     $lock=$managed?false:wuai_sluyu_lock('poll_'.$id);

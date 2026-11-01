@@ -142,6 +142,7 @@ function wuai_sluyu_download_admin_fields($post) {
     echo '<p><label>下载积分价格（仅积分模式）<input type="number" min="1" max="1000000" name="wuai_sluyu_download_cost" value="'.max(1,absint(wuai_sluyu_post_meta($post->ID,'download_cost',10))).'" class="widefat"></label></p><p><label><input type="checkbox" name="wuai_sluyu_download_new_version" value="1"> 新收费版本（不沿用旧版积分解锁）</label></p><p>改链接默认保留当前已购权益；独立正文与下载卡片是两个权限。积分不是现金，资源不保证永久在线。圈内下载需先为话题选择圈子。</p>';
 }
 function wuai_sluyu_download_save_fields($id) {
+    if(function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($id))return;
     if(wuai_sluyu_banned(get_current_user_id()) || !wp_verify_nonce(wuai_sluyu_input('wuai_sluyu_resource_nonce'),'wuai_sluyu_resource') || !current_user_can('edit_others_posts') || !current_user_can('edit_post',$id))return;
     if(!isset($_POST['wuai_sluyu_download_url'],$_POST['wuai_sluyu_download_access']))return;
     $lock=wuai_sluyu_protected_post_lock($id);

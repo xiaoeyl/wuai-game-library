@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WUAI_SLUYU_VERSION', '1.5.0');
+define('WUAI_SLUYU_VERSION', '1.6.0');
 define('WUAI_SLUYU_ECONOMY_CONTRACT', 1);
 define('WUAI_SLUYU_DIR', get_stylesheet_directory());
 define('WUAI_SLUYU_URI', get_stylesheet_directory_uri());
@@ -14,6 +14,8 @@ require_once WUAI_SLUYU_DIR . '/inc/admin-options.php';
 require_once WUAI_SLUYU_DIR . '/inc/github-updater.php';
 require_once WUAI_SLUYU_DIR . '/inc/frontend.php';
 require_once WUAI_SLUYU_DIR . '/inc/portal.php';
+require_once WUAI_SLUYU_DIR . '/inc/reference-discovery.php';
+require_once WUAI_SLUYU_DIR . '/inc/announcements.php';
 require_once WUAI_SLUYU_DIR . '/inc/community.php';
 require_once WUAI_SLUYU_DIR . '/inc/economy.php';
 require_once WUAI_SLUYU_DIR . '/inc/bounties.php';
@@ -29,6 +31,10 @@ require_once WUAI_SLUYU_DIR . '/inc/listings.php';
 require_once WUAI_SLUYU_DIR . '/inc/downloads.php';
 require_once WUAI_SLUYU_DIR . '/inc/guess-answer.php';
 require_once WUAI_SLUYU_DIR . '/inc/circle-moderation.php';
+require_once WUAI_SLUYU_DIR . '/inc/reference-aliases.php';
+require_once WUAI_SLUYU_DIR . '/inc/topic-media.php';
+require_once WUAI_SLUYU_DIR . '/inc/topic-media-cleanup.php';
+require_once WUAI_SLUYU_DIR . '/inc/topic-media-upload-intent.php';
 require_once WUAI_SLUYU_DIR . '/inc/invitations.php';
 require_once WUAI_SLUYU_DIR . '/inc/membership-state.php';
 require_once WUAI_SLUYU_DIR . '/inc/portal-views.php';

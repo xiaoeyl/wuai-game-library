@@ -13,6 +13,7 @@ function wuai_sluyu_portal_pages() {
         'listings' => ['供求广场', '审核制供求信息与站内联系', 'megaphone-line'],
         'invitations' => ['我的邀请码', '一次性邀请，共同维护友善社区', 'mail-send-line'],
         'newsflashes' => ['解忧资讯', '发现新鲜事，分享值得关注的消息', 'notification-3-line'],
+        'announcement' => ['站点公告', '站点管理员发布的公开通知与使用提醒', 'notification-3-line'],
         'links' => ['网址导航', '收藏好网站，也欢迎推荐你的站点', 'links-line'],
         'document' => ['帮助中心', '下载、解压、账户与订单使用指南', 'book-open-line'],
         'directmessage' => ['往来私信', '只属于你与收件人的对话', 'mail-send-line'],
@@ -30,13 +31,14 @@ function wuai_sluyu_portal_pages() {
         'mianzesm' => ['免责声明', '尊重原创，规范使用', 'shield-user-line'],
         'submit' => ['发布中心', '投稿、发布话题、推荐网站与提交工单', 'edit-line'],
         'tools' => ['实用工具', '二维码、文本处理与密码生成，全部在本地运行', 'tools-line'],
+        'tags' => ['全部标签', '按标签发现公开文章', 'price-tag-3-line'],
         'more' => ['发现更多', '站内服务与频道一览', 'apps-line'],
     ];
 }
 
 function wuai_sluyu_channels() {
     return [
-        'webxw' => ['宅趣资讯', '资讯', ['hhuaywj'=>'绘画源文件','dmzt'=>'动漫杂谈','dmzb'=>'动漫周边','cosjxuan'=>'cos鉴赏']],
+        'webxw' => ['宅趣资讯', '资讯', ['hhuaywj'=>'绘画源文件','dmzt'=>'动漫杂谈','dmzb'=>'动漫周边','cosjxuan'=>'cos鉴赏','yxzx'=>'游戏资讯']],
         'pcgame' => ['游戏资源', '游戏资源', ['dzmxss'=>'动作冒险','jsbyu'=>'角色扮演','qzsji'=>'枪战射击','tiyujs'=>'体育竞速','kbjs'=>'恐怖惊悚','mnijys'=>'模拟经营','rxgdo'=>'热血格斗','xxyizhi'=>'休闲益智','jsusak'=>'即时战略','cyilv'=>'策略战棋','mfgf'=>'免费国风','ljzhhe'=>'联机整合']],
         'tuimg' => ['次元图包', '图包', ['pzmtus'=>'P站插画','dmanmeitu'=>'动漫美图','yxtubao'=>'动漫图包','pzmjiy'=>'画师图集']],
         'xiezhenji' => ['写真美图', '美图', ['cosplay'=>'Cosplay','shyin'=>'摄影图册']],

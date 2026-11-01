@@ -81,30 +81,40 @@
         function check(force) {
             if (running || checking) return;
             if (force) remember('');
+            jobId = '';
             checking = true;
             checkButton.prop('disabled', true);
             installButton.prop('hidden', true);
             panel.attr('aria-busy', 'true');
             state('checking', '正在检查主题更新…', '正在连接 GitHub，请稍候。');
             request('check_update', { force: force ? 1 : 0 }).done(function (result) {
-                if (result.success) showRelease(result.data);
+                if (result.success && result.data.active) {
+                    showActive(result.data);
+                    schedulePoll();
+                } else if (result.success) showRelease(result.data);
                 else error(result.data && result.data.message || '未能获取版本信息，请稍后重试。');
             }).fail(function (xhr) { error(failure(xhr)); }).always(function () {
                 checking = false;
-                checkButton.prop('disabled', false);
-                panel.attr('aria-busy', 'false');
+                checkButton.prop('disabled', running);
+                panel.attr('aria-busy', running ? 'true' : 'false');
             });
         }
         function showJob(data) {
             var job = data.job;
-            if (!job || !job.id || jobId && job.id !== jobId) return false;
+            if (!job || !job.id || jobId && job.id !== jobId && !data.active) return false;
             jobId = job.id;
             if (data.current) panel.find('.wuai-update-current').text('V' + data.current);
             progress(job.percent);
-            if (job.phase === 'complete' || job.phase === 'error') {
+            if (data.active && (job.phase === 'complete' || job.phase === 'error')) {
+                busy(true);
+                progress(Math.min(99, Number(job.percent) || 0));
+                state('installing', '正在完成更新收尾…', '服务器更新进程尚未释放，请勿重复安装或关闭文件写入权限。');
+            } else if (job.phase === 'complete' || job.phase === 'error') {
                 clearTimeout(pollTimer);
                 busy(false);
-                remember(job.phase === 'complete' ? job.id : '');
+                // A terminal job is only a result for this page view. Do not persist
+                // its id, otherwise a later tab can resurrect an old progress card.
+                remember('');
                 installButton.prop('hidden', true);
                 panel.find('.wuai-update-reload').prop('hidden', job.phase !== 'complete');
                 state(job.phase, job.phase === 'complete' ? '主题更新成功' : '本次更新未完成', job.message);
@@ -115,6 +125,12 @@
                 state('installing', '正在更新主题，请稍候…', job.message);
             }
             return true;
+        }
+        function showActive(data) {
+            if (showJob(data)) return;
+            busy(true);
+            installButton.prop('hidden', true);
+            state('installing', '正在确认服务器更新进度…', data.message || '已有更新进程正在运行，正在等待服务器报告进度，请勿重复安装。');
         }
         function schedulePoll() {
             clearTimeout(pollTimer);
@@ -127,14 +143,16 @@
                     message.text(result.data && result.data.message || '暂时无法读取进度，正在重试…');
                     return;
                 }
-                if (showJob(result.data)) pollFailures = 0;
+                if (result.data.active) { showActive(result.data); pollFailures = 0; }
+                else if (showJob(result.data)) pollFailures = 0;
                 else pollFailures++;
             }).fail(function () {
                 pollFailures++;
                 message.text('服务器正在处理或连接暂时中断，正在重新获取进度，请勿重复更新。');
             }).always(function () {
                 if (pollFailures >= 12) {
-                    busy(false);
+                    clearTimeout(pollTimer);
+                    busy(true);
                     error('暂时无法确认安装结果。请刷新页面恢复检测；刷新前不要重复提交更新。');
                     panel.find('.wuai-update-reload').prop('hidden', false);
                     checkButton.prop('disabled', true);
@@ -179,10 +197,26 @@
         // Restore an interrupted browser session without starting a second installation.
         request('update_status').done(function (result) {
             var job = result.success && result.data.job;
-            if (job && job.id && (['complete', 'error'].indexOf(job.phase) < 0 || remembered() === job.id)) {
-                showJob(result.data);
+            if (!result.success) {
+                showActive({ message: result.data && result.data.message });
                 schedulePoll();
-            } else check(false);
-        }).fail(function () { check(false); });
+            } else if (result.data.active) {
+                showActive(result.data);
+                schedulePoll();
+            } else if (job && job.id && remembered() === job.id) {
+                showJob(result.data);
+            } else {
+                remember('');
+                check(false);
+            }
+        }).fail(function (xhr) {
+            if (xhr.status === 403) {
+                busy(false);
+                error(failure(xhr));
+            } else {
+                showActive({ message: '暂时无法确认服务器端更新状态，正在重试，请勿重复安装。' });
+                schedulePoll();
+            }
+        });
     });
 })(jQuery);

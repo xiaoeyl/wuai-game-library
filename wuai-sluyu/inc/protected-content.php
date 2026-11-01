@@ -12,6 +12,7 @@ function wuai_sluyu_protected_modes() {
 
 function wuai_sluyu_protected_supported($post) {
     $post = get_post($post);
+    if ($post && function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($post->ID)) { return false; }
     return $post && ($post->post_type === 'post' || ($post->post_type === 'sluyu_topic' && in_array(get_post_meta($post->ID, '_wuai_topic_kind', true), ['', 'topic'], true)));
 }
 

@@ -22,7 +22,7 @@ const base='http://127.0.0.1:8771';
   for(const old of before)assert.deepEqual(second.find(item=>item.id===old.id).content,old.content,'Existing pages are unchanged.');
   for(const key of ['account','circle','document','mission','links']){await page.goto(base+'/?sluyu_page='+key);assert.equal(await page.locator('.sluyu-portal-hero').count(),1,key);}
   await page.goto(base+'/wp-admin/widgets.php'); assert.match(await page.locator('body').innerText(),/首页侧栏|小工具/);
-  await page.goto(base+'/wp-admin/admin.php?page=wuai-sluyu'); await page.locator('.csf-nav a').filter({hasText:/^社区与商城$/}).click();
+  await page.goto(base+'/wp-admin/admin.php?page=wuai-sluyu'); await page.locator('.csf-nav a').filter({hasText:/^用户&互动$/}).click(); await page.locator('.csf-nav a').filter({hasText:/^积分与签到$/}).click();
   assert.equal(await page.locator('[name="wuai_sluyu_options[checkin_points]"]').isVisible(),true);
   await page.waitForFunction(()=>getComputedStyle(document.querySelector('[name="wuai_sluyu_options[checkin_points]"]').closest('.csf-section')).opacity==='1');
   await page.screenshot({path:path.resolve('dist/checks-v1.1.0/services-admin.png'),fullPage:true});

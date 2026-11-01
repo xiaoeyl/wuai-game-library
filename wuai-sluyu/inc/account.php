@@ -211,6 +211,7 @@ function wuai_sluyu_account_render_list($tab, $uid, $page = 1, $per_page = 12, $
             $types = wuai_sluyu_account_types();
             echo '<div><span><b>' . esc_html($entry->post_title ?: '无标题') . '</b><p class="sluyu-muted">' . esc_html(($types[$entry->post_type] ?? '') . ' · ' . wuai_sluyu_account_status($entry)) . '</p></span><div class="sluyu-button-row">';
             if (wuai_sluyu_public_post($entry->ID)) { echo '<a class="sluyu-action-plain" href="' . esc_url(get_permalink($entry)) . '">查看</a>'; }
+            if (function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($entry->ID)) { echo '<a class="sluyu-action-plain" href="' . esc_url(wuai_sluyu_portal_url('submit', ['kind'=>'topic-images','draft'=>$entry->ID])) . '">图片编辑器</a>'; }
             if (!is_wp_error(wuai_sluyu_account_submission_permission($entry, $uid, 'edit_submission'))) { echo '<a class="sluyu-action-plain" href="' . esc_url(wuai_sluyu_portal_url('account', ['tab'=>'submissions','edit'=>$entry->ID])) . '">编辑</a>'; }
             if ($entry->post_status !== 'draft' && !is_wp_error(wuai_sluyu_account_submission_permission($entry, $uid, 'withdraw_submission'))) { wuai_sluyu_action_button('withdraw_submission', '撤回', ['id'=>$entry->ID,'confirm'=>'撤回后内容不再公开，重新发布需要审核。确认撤回？']); }
             if (!is_wp_error(wuai_sluyu_account_submission_permission($entry, $uid, 'delete_submission'))) { wuai_sluyu_action_button('delete_submission', '删除', ['id'=>$entry->ID,'confirm'=>'确认删除这份非公开稿件？此操作不会删除账号、订单或积分记录。']); }

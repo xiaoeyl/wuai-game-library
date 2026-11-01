@@ -22,6 +22,11 @@ function wuai_sluyu_asset($path) {
 }
 
 function wuai_sluyu_query($key, $default = '') {
+    if (function_exists('wuai_sluyu_reference_alias_query')) {
+        $handled = false;
+        $value = wuai_sluyu_reference_alias_query($key, $default, $handled);
+        if ($handled) { return $value; }
+    }
     if (!isset($_GET[$key])) {
         if ($key==='group' && isset($_GET['circle_id']) && is_scalar($_GET['circle_id'])) { return sanitize_text_field(wp_unslash((string)$_GET['circle_id'])); }
         if ($key==='kind') {

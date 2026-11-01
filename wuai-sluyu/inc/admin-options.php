@@ -2,6 +2,7 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+require_once __DIR__ . '/admin-navigation.php';
 
 /** Theme settings stored under the existing option key. */
 function wuai_sluyu_defaults() {
@@ -156,7 +157,7 @@ function wuai_sluyu_settings_history_action() {
     } else {
         wp_die('无效的备份操作。', '', ['response' => 400]);
     }
-    wp_safe_redirect(admin_url('admin.php?page=wuai-sluyu&settings-history=' . $operation) . '#tab=' . rawurlencode('备份与恢复'));
+    wp_safe_redirect(add_query_arg('settings-history', $operation, admin_url('admin.php?page=wuai-sluyu')) . '#tab=' . wuai_sluyu_settings_tab('backup'));
     exit;
 }
 add_action('admin_post_wuai_sluyu_settings_history', 'wuai_sluyu_settings_history_action');
@@ -198,6 +199,7 @@ function wuai_sluyu_register_csf_options() {
         'framework_class' => 'wuai-csf-settings',
         'theme' => 'light',
         'show_bar_menu' => false,
+        // Keep the WordPress menu compact; the CSF panel owns the complete settings tree.
         'show_sub_menu' => false,
         'show_in_network' => false,
         'show_search' => true,
@@ -213,33 +215,18 @@ function wuai_sluyu_register_csf_options() {
         'footer_text' => '吾爱森鹿语 · CSF 2.2.0 / 子比设置面板',
         'footer_credit' => '吾爱森鹿语主题设置',
     ]);
-    CSF::createSection($prefix, [
-        'title' => '主题概览', 'icon' => 'fa fa-dashboard',
-        'fields' => [['type' => 'callback', 'function' => 'wuai_sluyu_csf_overview']],
-    ]);
-    CSF::createSection($prefix, ['id' => 'basic', 'title' => '基础设置', 'icon' => 'fa fa-cog']);
-    CSF::createSection($prefix, [
-        'title' => '社区与商城', 'icon' => 'fa fa-users',
-        'fields' => [
-            ['type'=>'content', 'content'=>'<p>服务页面无需预建即可访问。通过服务管理可创建可编辑页面和分类，已有内容不会覆盖。</p><a class="button" href="' . esc_url(admin_url('admin.php?page=wuai-sluyu-services')) . '">站内服务管理</a>'],
-            wuai_sluyu_csf_field('checkin_points','number','每日签到积分',['min'=>0,'max'=>10000]),
-            wuai_sluyu_csf_field('makeup_points','number','每个缺签日补签费用',['min'=>1,'max'=>10000]),
-            wuai_sluyu_csf_field('membership_products','text','会员商品 ID',['desc'=>'使用英文逗号分隔 WooCommerce 简单商品 ID，并在商品编辑页设置会员有效天数。真实付款确认后开通会员；退款撤回对应授权。']),
-            wuai_sluyu_csf_field('public_coupon_codes','textarea','公开发放的优惠码',['desc'=>'每行一个已在 WooCommerce 创建的优惠码。只展示这里明确配置的券，结算时验证适用性。']),
-        ],
-    ]);
-    CSF::createSection($prefix, [
-        'parent' => 'basic', 'title' => '站点信息', 'icon' => 'fa fa-globe',
-        'fields' => [
+
+    // The top-level groups intentionally follow Zibll's information architecture. Each
+    // setting lives in one child section so the sidebar remains scannable as the theme grows.
+    CSF::createSection($prefix, ['id' => 'global', 'title' => '全局&功能', 'icon' => 'fa fa-fw fa-bullseye']);
+    wuai_sluyu_csf_section('overview', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_overview']]);
+    wuai_sluyu_csf_section('site', [
             wuai_sluyu_csf_field('site_title', 'text', '站点显示名称'),
             wuai_sluyu_csf_field('site_description', 'textarea', '站点简介'),
             wuai_sluyu_csf_field('site_logo', 'upload', '网站 Logo', ['desc' => '支持媒体库或图片外链；留空使用 WordPress 自定义 Logo 或默认 Logo。']),
             wuai_sluyu_csf_field('site_icon', 'upload', '站点图标', ['desc' => '建议使用正方形 PNG 图片。']),
-        ],
     ]);
-    CSF::createSection($prefix, [
-        'parent' => 'basic', 'title' => '页脚与导航', 'icon' => 'fa fa-bars',
-        'fields' => [
+    wuai_sluyu_csf_section('footer', [
             wuai_sluyu_csf_field('footer_description', 'textarea', '页脚网站介绍'),
             wuai_sluyu_csf_field('footer_text', 'textarea', '页脚说明'),
             wuai_sluyu_csf_field('footer_banner', 'upload', '页脚上方横幅', ['desc' => '留空隐藏；默认使用参考站的装饰横幅。']),
@@ -253,12 +240,8 @@ function wuai_sluyu_register_csf_options() {
             wuai_sluyu_csf_field('footer_help_url', 'text', '帮助文档链接'),
             wuai_sluyu_csf_field('footer_about_url', 'text', '关于本站链接'),
             ['type' => 'content', 'content' => '<p>主导航和页脚导航使用 WordPress 菜单管理。</p><a class="button" href="' . esc_url(admin_url('nav-menus.php')) . '">管理导航菜单</a>'],
-        ],
     ]);
-    CSF::createSection($prefix, [
-        'parent' => 'basic', 'title' => '右侧快捷导航', 'icon' => 'fa fa-th-list',
-        'description' => '填写你自己的页面地址。未设置时优先识别已有页面；未开放的服务显示说明，不跳到不存在的页面。',
-        'fields' => [
+    wuai_sluyu_csf_section('rail', [
             wuai_sluyu_csf_field('rail_vip_url', 'text', '会员中心链接'),
             wuai_sluyu_csf_field('rail_account_url', 'text', '个人中心链接'),
             wuai_sluyu_csf_field('rail_cart_url', 'text', '购物车链接'),
@@ -267,56 +250,26 @@ function wuai_sluyu_register_csf_options() {
             wuai_sluyu_csf_field('rail_support_url', 'text', '客服链接'),
             wuai_sluyu_csf_field('rail_support_text', 'textarea', '客服说明'),
             wuai_sluyu_csf_field('rail_group_qr', 'upload', '社群二维码', ['desc' => '留空时只显示当前页面二维码。']),
-        ],
-    ]);
-    CSF::createSection($prefix, ['id' => 'home', 'title' => '首页布局', 'icon' => 'fa fa-home']);
-    CSF::createSection($prefix, [
-        'parent' => 'home', 'title' => '首屏与搜索', 'icon' => 'fa fa-picture-o',
-        'fields' => [
+    ], '填写你自己的页面地址。未设置时优先识别已有页面；未开放的服务显示说明，不跳到不存在的页面。');
+    wuai_sluyu_csf_section('announcements', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_announcements']]);
+
+    CSF::createSection($prefix, ['id' => 'page', 'title' => '页面&显示', 'icon' => 'fa fa-fw fa-calendar-check-o']);
+    wuai_sluyu_csf_section('home', [
             wuai_sluyu_csf_field('hero_title', 'text', '首屏主标题'),
             wuai_sluyu_csf_field('hero_notice', 'textarea', '首页公告'),
             wuai_sluyu_csf_field('hero_video', 'upload', '背景视频', ['library' => 'video', 'preview' => false, 'button_title' => '选择视频', 'desc' => '支持 MP4 外链或媒体库视频；视频不能播放时使用背景图片。']),
             wuai_sluyu_csf_field('hero_image', 'upload', '背景图片'),
             wuai_sluyu_csf_field('hot_words', 'text', '热搜关键词', ['desc' => '使用英文或中文逗号分隔。']),
-        ],
-    ]);
-    CSF::createSection($prefix, [
-        'parent' => 'home', 'title' => '栏目与广告', 'icon' => 'fa fa-th-large',
-        'fields' => [
             wuai_sluyu_csf_field('sections', 'textarea', '首页栏目', ['desc' => '每行一个已有分类名称，最多显示四个栏目。只显示已发布文章，空栏目不生成演示文章。']),
             wuai_sluyu_csf_field('promo_image', 'upload', '首页横幅'),
             wuai_sluyu_csf_field('ad_image', 'upload', '侧栏广告图片'),
-        ],
     ]);
-    CSF::createSection($prefix, [
-        'title' => '文章与资源', 'icon' => 'fa fa-file-text-o',
-        'fields' => [
-            wuai_sluyu_csf_field('resource_badge', 'text', '默认标题徽章'),
-            wuai_sluyu_csf_field('download_title', 'text', '网盘下载区标题'),
-            wuai_sluyu_csf_field('show_post_meta', 'switcher', '显示文章信息'),
-            wuai_sluyu_csf_field('show_resource_box', 'switcher', '显示资源下载区'),
-            wuai_sluyu_csf_field('enable_comments', 'switcher', '显示文章评论'),
-            wuai_sluyu_csf_field('article_banner', 'upload', '文章顶部横幅'),
-            wuai_sluyu_csf_field('article_show_cover', 'switcher', '正文前显示特色图片', ['desc' => '参考站正文直接从文章内容开始，默认关闭独立大封面。']),
-            wuai_sluyu_csf_field('article_show_toc', 'switcher', '显示文章目录'),
-            wuai_sluyu_csf_field('article_show_related', 'switcher', '显示相关推荐'),
-            wuai_sluyu_csf_field('legacy_html_links', 'switcher', '使用 .html 文章地址', ['desc' => '更改后请在“设置 → 固定链接”保存一次，刷新重写规则。']),
-        ],
-    ]);
-    CSF::createSection($prefix, ['id' => 'appearance', 'title' => '界面美化', 'icon' => 'fa fa-paint-brush']);
-    CSF::createSection($prefix, [
-        'parent' => 'appearance', 'title' => '颜色与布局', 'icon' => 'fa fa-adjust',
-        'fields' => [
+    wuai_sluyu_csf_section('layout', [
             wuai_sluyu_csf_field('primary_color', 'color', '主色调'),
             wuai_sluyu_csf_field('accent_color', 'color', '辅助色'),
             wuai_sluyu_csf_field('background_color', 'color', '页面背景色'),
             wuai_sluyu_csf_field('border_radius', 'number', '卡片圆角', ['unit' => 'px', 'attributes' => ['min' => 0, 'max' => 32]]),
             wuai_sluyu_csf_field('content_width', 'number', '内容区域宽度', ['unit' => 'px', 'attributes' => ['min' => 980, 'max' => 1600]]),
-        ],
-    ]);
-    CSF::createSection($prefix, [
-        'parent' => 'appearance', 'title' => '交互与特效', 'icon' => 'fa fa-magic',
-        'fields' => [
             wuai_sluyu_csf_field('show_floating_tools', 'switcher', '显示悬浮工具'),
             wuai_sluyu_csf_field('show_mobile_nav', 'switcher', '显示移动端底部导航'),
             wuai_sluyu_csf_field('enable_lightbox', 'switcher', '文章图片灯箱'),
@@ -324,43 +277,94 @@ function wuai_sluyu_register_csf_options() {
             wuai_sluyu_csf_field('enable_particles', 'switcher', '粒子背景'),
             wuai_sluyu_csf_field('glass_cards', 'switcher', '玻璃卡片效果'),
             wuai_sluyu_csf_field('color_scrollbar', 'switcher', '彩色滚动条'),
-        ],
     ]);
-    CSF::createSection($prefix, [
-        'title' => 'SEO 设置', 'icon' => 'fa fa-search',
-        'fields' => [
+    wuai_sluyu_csf_section('widgets', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_widgets']]);
+    wuai_sluyu_csf_section('pages', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_pages']]);
+
+    CSF::createSection($prefix, ['id' => 'post', 'title' => '文章&列表', 'icon' => 'fa fa-fw fa-map-o']);
+    wuai_sluyu_csf_section('article', [
+            wuai_sluyu_csf_field('resource_badge', 'text', '默认标题徽章'),
+            wuai_sluyu_csf_field('download_title', 'text', '网盘下载区标题'),
+            wuai_sluyu_csf_field('show_post_meta', 'switcher', '显示文章信息'),
+            wuai_sluyu_csf_field('show_resource_box', 'switcher', '显示资源下载区'),
+            wuai_sluyu_csf_field('article_banner', 'upload', '文章顶部横幅'),
+            wuai_sluyu_csf_field('article_show_cover', 'switcher', '正文前显示特色图片', ['desc' => '参考站正文直接从文章内容开始，默认关闭独立大封面。']),
+            wuai_sluyu_csf_field('article_show_toc', 'switcher', '显示文章目录'),
+            wuai_sluyu_csf_field('article_show_related', 'switcher', '显示相关推荐'),
+    ]);
+    wuai_sluyu_csf_section('content', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_content']]);
+    wuai_sluyu_csf_section('downloads', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_downloads']]);
+
+    CSF::createSection($prefix, ['id' => 'cap', 'title' => '功能&权限', 'icon' => 'fa fa-fw fa-shield']);
+    wuai_sluyu_csf_section('access', [
+            wuai_sluyu_csf_field('legacy_html_links', 'switcher', '使用 .html 文章地址', ['desc' => '更改后请在“设置 → 固定链接”保存一次，刷新重写规则。']),
+            ['type' => 'content', 'content' => '<p>文章、下载、社区和管理入口会按当前账号能力显示。主题不会绕过 WordPress 权限，也不会为未安装的商城插件伪造支付状态。</p>'],
+    ]);
+    wuai_sluyu_csf_section('registration', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_registration']]);
+    wuai_sluyu_csf_section('moderation', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_moderation']]);
+
+    CSF::createSection($prefix, ['id' => 'user', 'title' => '用户&互动', 'icon' => 'fa fa-fw fa-user-o']);
+    wuai_sluyu_csf_section('comments', [
+            wuai_sluyu_csf_field('enable_comments', 'switcher', '显示文章评论'),
+            ['type' => 'callback', 'function' => 'wuai_sluyu_csf_comments'],
+    ]);
+    wuai_sluyu_csf_section('users', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_users']]);
+    wuai_sluyu_csf_section('messages', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_messages']]);
+    wuai_sluyu_csf_section('points', [
+            wuai_sluyu_csf_field('checkin_points', 'number', '每日签到积分', ['min' => 0, 'max' => 10000]),
+            wuai_sluyu_csf_field('makeup_points', 'number', '每个缺签日补签费用', ['min' => 1, 'max' => 10000]),
+            ['type' => 'content', 'content' => '<p>本站积分是站内非现金记账单位，不提供充值、提现或现金兑换。WooCommerce 付款必须由已配置的支付网关完成确认。</p>'],
+    ]);
+    CSF::createSection($prefix, ['id' => 'pay', 'title' => '支付&付费', 'icon' => 'fa fa-fw fa-jpy']);
+    wuai_sluyu_csf_section('payment', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_payment']]);
+    wuai_sluyu_csf_section('bounties', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_bounties']]);
+
+    CSF::createSection($prefix, ['id' => 'shop', 'title' => '商城&商品', 'icon' => 'fa fa-fw fa-cart-plus']);
+    wuai_sluyu_csf_section('membership', [
+            wuai_sluyu_csf_field('membership_products', 'text', '会员商品 ID', ['desc' => '使用英文逗号分隔 WooCommerce 简单商品 ID，并在商品编辑页设置会员有效天数。真实付款确认后开通会员；退款撤回对应授权。']),
+            wuai_sluyu_csf_field('public_coupon_codes', 'textarea', '公开发放的优惠码', ['desc' => '每行一个已在 WooCommerce 创建的优惠码。只展示这里明确配置的券，结算时验证适用性。']),
+            ['type' => 'callback', 'function' => 'wuai_sluyu_csf_orders'],
+    ]);
+    wuai_sluyu_csf_section('orders', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_orders']]);
+
+    CSF::createSection($prefix, ['id' => 'forum', 'title' => '社区&论坛', 'icon' => 'fa fa-fw fa-grav']);
+    wuai_sluyu_csf_section('community', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_community']]);
+    wuai_sluyu_csf_section('circles', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_circles']]);
+    wuai_sluyu_csf_section('listings', [['type' => 'callback', 'function' => 'wuai_sluyu_csf_listings']]);
+
+    CSF::createSection($prefix, ['id' => 'over', 'title' => '扩展&增强', 'icon' => 'fa fa-fw fa-puzzle-piece']);
+    wuai_sluyu_csf_section('seo', [
             wuai_sluyu_csf_field('seo_description', 'textarea', '首页 SEO 描述'),
             wuai_sluyu_csf_field('seo_keywords', 'text', '首页关键词'),
             wuai_sluyu_csf_field('enable_og', 'switcher', '社交分享信息'),
-        ],
     ]);
-    CSF::createSection($prefix, [
-        'title' => '在线更新', 'icon' => 'fa fa-refresh',
-        'fields' => [
+    wuai_sluyu_csf_section('update', [
             ['type' => 'callback', 'function' => 'wuai_sluyu_csf_update_info'],
             wuai_sluyu_csf_field('github_owner', 'text', 'GitHub 用户名'),
             wuai_sluyu_csf_field('github_repo', 'text', 'GitHub 仓库名'),
             wuai_sluyu_csf_field('github_channel', 'select', '更新通道', ['options' => ['stable' => '正式版', 'beta' => '预发布版'], 'desc' => '正式版读取最新 Release，预发布版同时检查标记为预发布的版本。']),
-        ],
     ]);
-    CSF::createSection($prefix, [
-        'title' => '备份与恢复', 'icon' => 'fa fa-database',
-        'fields' => [
+    wuai_sluyu_csf_section('backup', [
             ['type' => 'notice', 'style' => 'info', 'content' => '修改、导入或重置前自动保留原配置，最多保存 20 份。备份仅包含主题设置，不包含文章和媒体文件。'],
             ['type' => 'backup', 'title' => '导入 / 导出设置'],
             ['type' => 'callback', 'function' => 'wuai_sluyu_csf_history'],
-        ],
     ]);
 }
 
 function wuai_sluyu_csf_overview() {
     echo '<div class="wuai-csf-overview"><h2>吾爱森鹿语 V' . esc_html(WUAI_SLUYU_VERSION) . '</h2>';
     echo '<p>设置面板使用用户提供的子比源码中的 Codestar Framework 2.2.0 核心与子比设置层。左侧选择分组，右上角可搜索、保存或重置设置。</p>';
-    echo '<p>站点信息、首页布局、资源文章和美化设置沿用原配置，前台内容读取 WordPress 已发布文章。</p>';
+    echo '<p>站点信息、首页配置、文章资源和显示布局沿用原配置，前台内容读取 WordPress 已发布文章。</p>';
     echo '<p><a class="button button-primary" href="' . esc_url(home_url('/')) . '" target="_blank" rel="noopener">查看网站</a> ';
     echo '<a class="button" href="' . esc_url(admin_url('post-new.php')) . '">发布文章</a> ';
     echo '<a class="button" href="' . esc_url(admin_url('edit-tags.php?taxonomy=category')) . '">管理分类</a></p>';
     echo '<p class="description">WordPress ' . esc_html(get_bloginfo('version')) . ' · PHP ' . esc_html(PHP_VERSION) . ' · CSF ' . esc_html(CSF::$version) . '</p></div>';
+    echo '<div class="wuai-admin-quicklinks">';
+    $sections = wuai_sluyu_settings_sections();
+    foreach (['site', 'home', 'widgets', 'registration', 'users', 'points', 'community', 'circles', 'payment', 'orders', 'update', 'backup'] as $key) {
+        echo '<a href="' . esc_url(wuai_sluyu_settings_url($key)) . '"><i class="fa fa-fw fa-' . esc_attr($sections[$key][3]) . '" aria-hidden="true"></i><span>' . esc_html($sections[$key][2]) . '</span></a>';
+    }
+    echo '</div>';
 }
 
 function wuai_sluyu_csf_update_info() {
@@ -412,7 +416,7 @@ add_action('csf_enqueue', function () {
     wp_enqueue_style('wuai-csf-zibll', WUAI_SLUYU_URI . '/inc/csf-framework/assets/css/style.css', ['csf'], WUAI_SLUYU_VERSION);
     wp_enqueue_style('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/css/admin.css', ['wuai-csf-zibll'], WUAI_SLUYU_VERSION);
     wp_enqueue_script('wuai-sluyu-admin', WUAI_SLUYU_URI . '/assets/js/admin.js', ['jquery', 'csf'], WUAI_SLUYU_VERSION, true);
-    wp_localize_script('wuai-sluyu-admin', 'wuaiCsf', ['postUrl' => admin_url('admin-post.php')]);
+    wp_localize_script('wuai-sluyu-admin', 'wuaiCsf', ['postUrl' => admin_url('admin-post.php'), 'legacyTabs' => wuai_sluyu_settings_legacy_tabs(), 'defaultTab' => wuai_sluyu_settings_tab('overview')]);
     wp_enqueue_script('wuai-sluyu-updater', WUAI_SLUYU_URI . '/assets/js/admin-updater.js', ['jquery', 'wuai-sluyu-admin'], WUAI_SLUYU_VERSION, true);
     wp_localize_script('wuai-sluyu-updater', 'wuaiUpdater', ['ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('wuai_sluyu_update')]);
 });

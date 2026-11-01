@@ -35,6 +35,7 @@ function wuai_sluyu_circle_review_permission($id,$group,$uid=null) {
     return true;
 }
 function wuai_sluyu_circle_review_private($id) {
+    if(function_exists('wuai_sluyu_topic_media_review_private') && wuai_sluyu_topic_media_review_private($id))return true;
     if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id))return true;
     foreach(['_wuai_protected_content','_wuai_guess_config','_wuai_download_settings','_wuai_sluyu_download_url'] as $key)if(metadata_exists('post',$id,$key))return true;
     return get_post_meta($id,'_wuai_topic_kind',true)==='guess';
@@ -57,6 +58,7 @@ function wuai_sluyu_circle_review_poll_valid($id) {
 function wuai_sluyu_circle_review_config_valid($id) {
     // Even an altered topic kind cannot move economic review into this queue.
     if(function_exists('wuai_sluyu_bounty_managed') && wuai_sluyu_bounty_managed($id))return false;
+    if(function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($id) && !wuai_sluyu_topic_media_publishable($id))return false;
     $kind=get_post_meta($id,'_wuai_topic_kind',true);
     if(!in_array($kind,['','topic','question','poll','guess'],true))return false;
     if($kind==='poll' && !wuai_sluyu_circle_review_poll_valid($id))return false;
@@ -92,7 +94,7 @@ function wuai_sluyu_circle_review_audit($id) {
 function wuai_sluyu_circle_review_subject($id) {
     $post=get_post($id); if(!$post)return '';
     $state=[$post->ID,$post->post_author,$post->post_title,$post->post_content,$post->post_excerpt,$post->post_password,wuai_sluyu_circle_review_settings()];
-    foreach(['_wuai_topic_kind','_wuai_poll_choices','_wuai_poll_mode','_wuai_poll_max','_wuai_poll_deadline','_wuai_poll_closed','_wuai_protected_content','_wuai_guess_config','_wuai_download_settings','_wuai_sluyu_download_url','_wuai_sluyu_download_access','_wuai_sluyu_download_password','_wuai_sluyu_download_version','_wuai_sluyu_download_cost'] as $key)$state[]=[metadata_exists('post',$id,$key),get_post_meta($id,$key,true)];
+    foreach(['_wuai_topic_kind','_wuai_poll_choices','_wuai_poll_mode','_wuai_poll_max','_wuai_poll_deadline','_wuai_poll_closed','_wuai_protected_content','_wuai_guess_config','_wuai_download_settings','_wuai_sluyu_download_url','_wuai_sluyu_download_access','_wuai_sluyu_download_password','_wuai_sluyu_download_version','_wuai_sluyu_download_cost','_wuai_topic_media'] as $key)$state[]=[metadata_exists('post',$id,$key),get_post_meta($id,$key,true)];
     $groups=wuai_sluyu_circle_review_groups($id); if(is_wp_error($groups))return '';
     foreach($groups as $group)$state[]=[$group,wuai_sluyu_circle_status($group),get_term_meta($group,'_wuai_circle_owner',true),get_term_meta($group,'_wuai_circle_join',true),get_term_meta($group,'_wuai_circle_posting',true)];
     return hash_hmac('sha256',wp_json_encode($state),wp_salt('nonce'));

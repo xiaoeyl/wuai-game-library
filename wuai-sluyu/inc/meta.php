@@ -8,6 +8,10 @@ add_action('add_meta_boxes', function () {
 });
 
 function wuai_sluyu_resource_box($post) {
+    if(function_exists('wuai_sluyu_topic_media_managed') && wuai_sluyu_topic_media_managed($post->ID)) {
+        echo '<p>此稿件为公开图片话题，不支持额外下载或私密权限。图片上传后即公开，请在主编辑区核验后手动发布。</p>';
+        return;
+    }
     wp_nonce_field('wuai_sluyu_resource', 'wuai_sluyu_resource_nonce');
     $fields = [
         'version' => '版本号',

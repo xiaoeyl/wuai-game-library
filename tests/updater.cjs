@@ -32,7 +32,7 @@ fs.mkdirSync(out, { recursive: true });
             await p.goto(base + '/wp-login.php');
             await p.locator('#user_login').fill(user);
             await p.locator('#user_pass').fill('qa-local-only');
-            await Promise.all([p.waitForURL(/wp-admin/), p.locator('#wp-submit').click()]);
+            await Promise.all([p.waitForURL(url => !url.pathname.includes('wp-login.php')), p.locator('#wp-submit').click()]);
         }
         await login(page, 'qa_admin');
         await page.goto(base + '/wp-admin/admin.php?page=wuai-sluyu');
@@ -49,6 +49,7 @@ fs.mkdirSync(out, { recursive: true });
         await mode('current', { channel: 'stable' });
         let result = await check();
         assert.equal(result.success, true); assert.equal(result.data.available, false);
+        const baselineVersion = result.data.current;
         const baseline = (await mode('current')).options;
         const cached = await mode('current');
         await ajax('check_update');
@@ -58,7 +59,7 @@ fs.mkdirSync(out, { recursive: true });
         assert.equal((await ajax('check_update', { nonce: 'invalid' })).status(), 403);
         const subscriber = await browser.newContext();
         await login(await subscriber.newPage(), 'qa_subscriber');
-        for (const action of ['check_update', 'install_update', 'update_status']) assert.equal((await ajax(action, {}, subscriber)).status(), 403);
+        for (const action of ['check_update', 'install_update', 'update_status', 'abandon_update']) assert.equal((await ajax(action, {}, subscriber)).status(), 403);
         await subscriber.close();
         for (const name of ['missing', 'network', 'limited']) {
             await mode(name); result = await check(); assert.equal(result.success, false, name); assert.ok(result.data.message);
@@ -69,7 +70,8 @@ fs.mkdirSync(out, { recursive: true });
         assert.equal(result.data.latest, '99.0.0-beta.2');
         await mode('update', { channel: 'stable' }); await check();
         await page.reload();
-        await page.locator('.csf-nav-options a').filter({ hasText: /^在线更新$/ }).click();
+        await page.locator('.csf-nav-options a').filter({ hasText: /^扩展&增强$/ }).click();
+        await page.locator('.csf-nav-options a').filter({ hasText: /^文档&更新$/ }).click();
         await page.locator('.wuai-update[data-state="available"]').waitFor();
         assert.equal(await page.locator('.wuai-update-install').isVisible(), true);
         assert.equal(await page.evaluate(() => window.unsafeRelease), undefined, 'Release HTML is displayed as text');
@@ -94,10 +96,10 @@ fs.mkdirSync(out, { recursive: true });
         await page.setViewportSize({ width: 1500, height: 1000 });
         await mode('busy'); result = await install(); assert.equal(result.success, false); assert.equal(result.data.busy, true);
         await mode('stale'); result = await (await ajax('update_status')).json(); assert.equal(result.data.job.phase, 'error');
-        for (const name of ['download-fail', 'digest', 'bad-directory', 'missing-file', 'bad-version', 'requirements', 'install-fail']) {
+        for (const name of ['download-fail', 'digest', 'bad-directory', 'missing-file', 'missing-bootstrap', 'bad-version', 'requirements', 'install-fail']) {
             await mode(name); result = await install();
             assert.equal(result.data.job.phase, 'error', name + ': ' + JSON.stringify(result));
-            assert.equal(result.data.current, '1.0.8', name + ': old theme survives failed install');
+            assert.equal(result.data.current, baselineVersion, name + ': old theme survives failed install');
             assert.deepEqual((await mode(name)).options, baseline, name + ': options retained');
         }
         await mode('slow');
@@ -113,9 +115,15 @@ fs.mkdirSync(out, { recursive: true });
             await page.screenshot({ path: path.join(out, 'update-progress.png'), fullPage: true });
             await page.reload();
         }
-        await page.locator('.wuai-update[data-state="complete"]').waitFor({ timeout: 90000 });
+        // A reload can wait behind PHP's installer. The old page may consume its
+        // terminal result before navigation commits; a fresh release check is valid.
+        await page.waitForFunction(() => ['complete', 'current'].includes(document.querySelector('.wuai-update').dataset.state), null, { timeout: 90000 });
         assert.equal(submissions, 1, 'Double click submits once');
-        assert.equal(await page.locator('.wuai-update-progress').getAttribute('aria-valuenow'), '100');
+        const terminal = (await (await ajax('update_status')).json()).data;
+        assert.equal(terminal.active, false);
+        assert.equal(terminal.job.phase, 'complete');
+        assert.equal(terminal.job.percent, 100);
+        if (await page.locator('.wuai-update').getAttribute('data-state') === 'complete') assert.equal(await page.locator('.wuai-update-progress').getAttribute('aria-valuenow'), '100');
         assert.match(await page.locator('.wuai-update-current').textContent(), /99\.0\.0/);
         const finished = await mode('current');
         for (const phase of ['checking', 'downloading', 'unpacking', 'installing', 'complete']) assert.ok(finished.phases.includes(phase), phase);
@@ -124,7 +132,7 @@ fs.mkdirSync(out, { recursive: true });
         await page.screenshot({ path: path.join(out, 'update-complete.png'), fullPage: true });
         await page.reload();
         assert.match(await page.locator('.wuai-update-current').textContent(), /99\.0\.0/);
-        await page.locator('.wuai-update[data-state="complete"]').waitFor();
+        await page.locator('.wuai-update[data-state="current"]').waitFor();
         await page.unrouteAll({ behavior: 'wait' });
         assert.deepEqual(errors, []);
         console.log('PASS: real WP checks/cache/channels/auth/errors; real downloads/digest/package validation; failed replacement rollback; in-page install, progress, double-click, version and options retained; desktop/mobile.');
