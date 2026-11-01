@@ -121,7 +121,7 @@ add_filter('upgrader_source_selection', function ($source, $remote_source, $upgr
     $style = (string) $wp_filesystem->get_contents($source . 'style.css');
     $functions = (string) $wp_filesystem->get_contents($source . 'functions.php');
     // Reject incomplete packages before moving the old theme out of the way.
-    $bootstrap_files = [$functions, (string) $wp_filesystem->get_contents($source . 'inc/admin-options.php')];
+    $bootstrap_files = [$functions, (string) $wp_filesystem->get_contents($source . 'inc/admin-options.php'), (string) $wp_filesystem->get_contents($source . 'inc/github-updater.php')];
     foreach ($bootstrap_files as $bootstrap) {
         preg_match_all('~require(?:_once)?\s+(?:WUAI_SLUYU_DIR|__DIR__)\s*\.\s*[\'"](/[^\'"]+)[\'"]~', $bootstrap, $includes);
         foreach ($includes[1] as $include) {
@@ -209,18 +209,16 @@ add_action('wp_ajax_wuai_sluyu_install_update', function () {
         set_site_transient('update_themes', wuai_sluyu_update_transient(get_site_transient('update_themes'), $release));
         wuai_sluyu_backup_options('在线更新至 ' . $version);
         $download = function ($reply, $url) use ($package, &$downloaded_file) {
-            if ($url !== $package['url']) {
+            if ($reply !== false || $url !== $package['url']) {
                 return $reply;
             }
-            wuai_sluyu_update_progress('downloading', 20, '正在从 GitHub 下载主题安装包…');
-            $file = download_url($url, 180);
+            $file = wuai_sluyu_update_download_package($package, function ($message) {
+                wuai_sluyu_update_progress('downloading', 20, $message);
+            });
             if (is_wp_error($file)) {
                 return $file;
             }
             $downloaded_file = $file;
-            if (preg_match('/^sha256:([a-f0-9]{64})$/i', $package['digest'], $digest) && !hash_equals(strtolower($digest[1]), hash_file('sha256', $file))) {
-                return new WP_Error('theme_package_digest', '下载文件的 SHA256 校验失败，旧主题未被替换，请重新下载。');
-            }
             wuai_sluyu_update_progress('unpacking', 45, '安装包已下载，正在解压和校验…');
             return $file;
         };

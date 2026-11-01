@@ -63,7 +63,15 @@ function wuai_sluyu_release_package($release) {
         }
         $url = (string) ($asset['browser_download_url'] ?? '');
         if ($url === $base . rawurlencode($name)) {
-            return ['url' => $url, 'digest' => (string) ($asset['digest'] ?? '')];
+            $api_url = '';
+            $id = $asset['id'] ?? 0;
+            if (is_int($id) && $id > 0) {
+                $expected = 'https://api.github.com/repos/' . $owner . '/' . $repo . '/releases/assets/' . $id;
+                if (($asset['url'] ?? '') === $expected) {
+                    $api_url = $expected;
+                }
+            }
+            return ['url' => $url, 'api_url' => $api_url, 'digest' => (string) ($asset['digest'] ?? ''), 'size' => is_int($asset['size'] ?? null) && $asset['size'] > 0 ? $asset['size'] : 0];
         }
     }
     return new WP_Error('update_package', '此版本尚未上传可安装的主题 ZIP，请在 GitHub Release 中上传 wuai-sluyu-v' . $version . '.zip。');
@@ -85,6 +93,7 @@ function wuai_sluyu_release_info($release) {
         'available' => version_compare($version, $current, '>'),
         'installable' => !is_wp_error($package) && current_user_can('update_themes') && wp_is_file_mod_allowed('wuai_sluyu_update'),
         'package_error' => is_wp_error($package) ? $package->get_error_message() : '',
+        'package_url' => is_wp_error($package) ? '' : $package['url'],
         'notes' => (string) ($release['body'] ?? ''),
         'url' => 'https://github.com/' . $owner . '/' . $repo . '/releases/tag/' . rawurlencode($release['tag_name']),
         'checked_at' => wp_date('Y-m-d H:i:s', $release['_checked_at'] ?? time()),
@@ -133,4 +142,5 @@ add_filter('themes_api', function ($result, $action, $args) {
     ];
 }, 10, 3);
 
+require_once __DIR__ . '/update-download.php';
 require_once __DIR__ . '/theme-update-actions.php';

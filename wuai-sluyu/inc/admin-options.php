@@ -368,6 +368,7 @@ function wuai_sluyu_csf_overview() {
 }
 
 function wuai_sluyu_csf_update_info() {
+    list($owner, $repo) = wuai_sluyu_update_source();
     ?>
     <div class="wuai-update" data-state="idle" aria-busy="false">
         <div class="wuai-update-card">
@@ -382,7 +383,10 @@ function wuai_sluyu_csf_update_info() {
                 <button type="button" class="but jb-blue wuai-update-install" hidden><i class="fa fa-cloud-download" aria-hidden="true"></i> 在线更新</button>
                 <button type="button" class="but jb-blue wuai-update-check"><i class="fa fa-refresh" aria-hidden="true"></i> 检查更新</button>
                 <button type="button" class="but c-blue wuai-update-reload" hidden>刷新页面</button>
+                <a class="but c-blue wuai-update-download" href="<?php echo esc_url('https://github.com/' . $owner . '/' . $repo . '/releases'); ?>" target="_blank" rel="noopener noreferrer" hidden>下载主题安装包</a>
+                <a class="but c-blue wuai-update-manual" href="<?php echo esc_url(admin_url('theme-install.php?tab=upload')); ?>" hidden>手动上传安装</a>
             </div>
+            <p class="description wuai-update-help" hidden>在线更新由网站服务器下载，与本机能否访问 GitHub 不同。若服务器持续超时，请先备份数据库和主题，再在本机下载 ZIP 并手动上传替换；不要解压或上传 GitHub 的整个仓库源码包。</p>
             <p class="wuai-update-meta"></p>
         </div>
         <div class="wuai-update-log" hidden><h4>更新日志 <a class="wuai-update-release" target="_blank" rel="noopener noreferrer">在 GitHub 查看</a></h4><div class="wuai-update-notes"></div></div>

@@ -23,6 +23,7 @@
         }
         function busy(value) {
             running = value;
+            if (value) recovery(false);
             panel.attr('aria-busy', value ? 'true' : 'false');
             checkButton.prop('disabled', value);
             installButton.prop('disabled', value);
@@ -45,10 +46,15 @@
             panel.find('.wuai-update-bar').css('width', percent + '%');
             panel.find('.wuai-update-percent').text(percent + '%');
         }
+        function recovery(show) {
+            panel.find('.wuai-update-download, .wuai-update-manual').prop('hidden', !show);
+            panel.find('.wuai-update-help').prop('hidden', !show || panel.attr('data-state') !== 'error');
+        }
         function error(text) {
             state('error', '暂时无法完成更新', text);
             latest = null;
             installButton.prop('hidden', true);
+            recovery(!running);
         }
         function releaseNotes(text) {
             var box = panel.find('.wuai-update-notes').empty(), list = null;
@@ -72,11 +78,13 @@
             panel.find('.wuai-update-meta').text(data.channel + ' · 最近检测：' + data.checked_at);
             releaseNotes(data.notes);
             panel.find('.wuai-update-release').attr('href', data.url);
+            if (data.package_url) panel.find('.wuai-update-download').attr('href', data.package_url);
             panel.find('.wuai-update-log').prop('hidden', false);
             panel.find('.wuai-update-progress-wrap, .wuai-update-reload').prop('hidden', true);
             state(data.available ? 'available' : 'current', data.available ? '发现新版本，可以更新啦' : '当前主题已经是最新版啦',
                 data.available ? (data.package_error || (data.installable ? '新版已准备就绪，点击在线更新即可安装。' : 'WordPress 已禁止在线修改文件，请手动上传主题。')) : '检测完成，暂时没有需要安装的新版本。');
             installButton.prop('hidden', !data.available || !data.installable);
+            recovery(data.available);
         }
         function check(force) {
             if (running || checking) return;
@@ -87,6 +95,7 @@
             installButton.prop('hidden', true);
             panel.attr('aria-busy', 'true');
             state('checking', '正在检查主题更新…', '正在连接 GitHub，请稍候。');
+            recovery(false);
             request('check_update', { force: force ? 1 : 0 }).done(function (result) {
                 if (result.success && result.data.active) {
                     showActive(result.data);
@@ -118,6 +127,7 @@
                 installButton.prop('hidden', true);
                 panel.find('.wuai-update-reload').prop('hidden', job.phase !== 'complete');
                 state(job.phase, job.phase === 'complete' ? '主题更新成功' : '本次更新未完成', job.message);
+                recovery(job.phase === 'error');
                 latest = null;
             } else {
                 busy(true);

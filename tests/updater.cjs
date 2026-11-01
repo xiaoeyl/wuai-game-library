@@ -96,20 +96,40 @@ fs.mkdirSync(out, { recursive: true });
         await page.setViewportSize({ width: 1500, height: 1000 });
         await mode('busy'); result = await install(); assert.equal(result.success, false); assert.equal(result.data.busy, true);
         await mode('stale'); result = await (await ajax('update_status')).json(); assert.equal(result.data.job.phase, 'error');
-        for (const name of ['download-fail', 'digest', 'bad-directory', 'missing-file', 'missing-bootstrap', 'bad-version', 'requirements', 'install-fail']) {
-            await mode(name); result = await install();
+        for (const name of ['download-fail', 'digest', 'bad-directory', 'missing-file', 'missing-bootstrap', 'missing-downloader', 'bad-version', 'requirements', 'install-fail']) {
+            await mode(name, { reset_downloads: 1 }); result = await install();
             assert.equal(result.data.job.phase, 'error', name + ': ' + JSON.stringify(result));
             assert.equal(result.data.current, baselineVersion, name + ': old theme survives failed install');
-            assert.deepEqual((await mode(name)).options, baseline, name + ': options retained');
+            const details = await mode(name);
+            assert.deepEqual(details.options, baseline, name + ': options retained');
+            if (name === 'download-fail') {
+                assert.equal(details.downloads.length, 3);
+                assert.match(result.data.job.message, /网站服务器.*超时/);
+                assert.match(result.data.job.message, /上传主题/);
+            }
+            if (name === 'digest') assert.equal(details.downloads.length, 1, 'Checksum failures never retry');
         }
-        await mode('slow');
+        await mode('download-timeout', { reset_downloads: 1 });
+        await page.locator('.wuai-update-check').click();
+        await page.locator('.wuai-update[data-state="available"]').waitFor();
+        await page.locator('.wuai-update-install').click();
+        await page.locator('.wuai-update[data-state="error"]').waitFor();
+        assert.match(await page.locator('.wuai-update-message').textContent(), /网站服务器.*超时/);
+        assert.equal(await page.locator('.wuai-update-check').isDisabled(), false);
+        assert.equal(await page.locator('.wuai-update-download').isVisible(), true);
+        assert.equal(await page.locator('.wuai-update-manual').isVisible(), true);
+        assert.match(await page.locator('.wuai-update-download').getAttribute('href'), /github\.com\/xiaoeyl\/wuai-game-library\/releases\/download\/v99\.0\.0\//);
+        assert.match(await page.locator('.wuai-update-manual').getAttribute('href'), /theme-install\.php\?tab=upload$/);
+        assert.equal((await mode('download-timeout')).downloads.length, 3);
+        await page.screenshot({ path: path.join(out, 'update-timeout-recovery.png'), fullPage: true });
+        await mode(process.env.WP_QA_FALLBACK ? 'fallback-install' : 'slow', { reset_downloads: 1 });
         await page.locator('.wuai-update-check').click();
         await page.locator('.wuai-update[data-state="available"]').waitFor();
         let submissions = 0;
         page.on('request', req => { if ((req.postData() || '').includes('action=wuai_sluyu_install_update')) submissions++; });
         interruptPollOnce = !!process.env.WP_QA_POLL_URL;
         await page.locator('.wuai-update-install').evaluate(button => { button.click(); button.click(); });
-        if (process.env.WP_QA_POLL_URL) {
+        if (process.env.WP_QA_POLL_URL && !process.env.WP_QA_FALLBACK) {
             await page.locator('.wuai-update-progress[aria-valuenow="20"]').waitFor();
             assert.equal(await page.locator('.wuai-update-install').isDisabled(), true);
             await page.screenshot({ path: path.join(out, 'update-progress.png'), fullPage: true });
@@ -126,12 +146,23 @@ fs.mkdirSync(out, { recursive: true });
         if (await page.locator('.wuai-update').getAttribute('data-state') === 'complete') assert.equal(await page.locator('.wuai-update-progress').getAttribute('aria-valuenow'), '100');
         assert.match(await page.locator('.wuai-update-current').textContent(), /99\.0\.0/);
         const finished = await mode('current');
+        if (process.env.WP_QA_FALLBACK) {
+            assert.equal(finished.downloads.length, 2, 'One timeout followed by one successful official API download');
+            assert.match(finished.downloads[1].url, /api\.github\.com\/repos\/xiaoeyl\/wuai-game-library\/releases\/assets\/99000$/);
+        }
         for (const phase of ['checking', 'downloading', 'unpacking', 'installing', 'complete']) assert.ok(finished.phases.includes(phase), phase);
         assert.deepEqual(finished.options, baseline);
         assert.ok(Object.values(finished.backups).some(b => b.reason === '在线更新至 99.0.0'));
         await page.screenshot({ path: path.join(out, 'update-complete.png'), fullPage: true });
         await page.reload();
         assert.match(await page.locator('.wuai-update-current').textContent(), /99\.0\.0/);
+        await page.waitForFunction(() => ['current', 'complete'].includes(document.querySelector('.wuai-update').dataset.state));
+        if (await page.locator('.wuai-update').getAttribute('data-state') === 'complete') {
+            // The install response and a polling response may cross navigation;
+            // one same-session terminal result is allowed, never repeated forever.
+            assert.equal(await page.evaluate(() => sessionStorage.getItem('wuai-update-job')), null);
+            await page.reload();
+        }
         await page.locator('.wuai-update[data-state="current"]').waitFor();
         await page.unrouteAll({ behavior: 'wait' });
         assert.deepEqual(errors, []);

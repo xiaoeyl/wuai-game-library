@@ -8,20 +8,38 @@ add_filter('pre_wp_mail', '__return_true', PHP_INT_MAX);
 function wuai_qa_release($version) {
     $mode = get_option('wuai_qa_update_mode', 'current');
     $root = dirname(__DIR__) . '/qa-update';
-    $package = $root . '/' . (in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'requirements'], true) ? $mode : 'valid') . '.zip';
+    $package = $root . '/' . (in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'missing-downloader', 'requirements'], true) ? $mode : 'valid') . '.zip';
     return [
         'tag_name' => 'v' . $version, 'draft' => false, 'prerelease' => strpos($version, '-') !== false,
         'body' => "## 测试版本\n\n- 页内检测、更新日志\n- 彩色进度与真实主题安装\n<script>window.unsafeRelease=true</script>",
         'assets' => $mode === 'no-asset' ? [] : [[
+            'id' => 99000, 'url' => 'https://api.github.com/repos/xiaoeyl/wuai-game-library/releases/assets/99000',
             'name' => 'wuai-sluyu-v' . $version . '.zip',
             'browser_download_url' => 'https://github.com/xiaoeyl/wuai-game-library/releases/download/v' . $version . '/wuai-sluyu-v' . $version . '.zip',
             'digest' => 'sha256:' . ($mode === 'digest' ? str_repeat('0', 64) : (is_file($package) ? hash_file('sha256', $package) : '')),
+            'size' => is_file($package) ? filesize($package) : 0,
         ]],
     ];
 }
 
 add_filter('pre_http_request', function ($pre, $args, $url) {
+    if ($pre !== false) return $pre;
     $mode = get_option('wuai_qa_update_mode', 'current');
+    $asset_api = $url === 'https://api.github.com/repos/xiaoeyl/wuai-game-library/releases/assets/99000';
+    if ($asset_api || strpos($url, 'https://github.com/xiaoeyl/wuai-game-library/releases/download/') === 0) {
+        $calls = get_option('wuai_qa_download_calls', []);
+        $calls[] = ['url' => $url, 'timeout' => $args['timeout'], 'sslverify' => $args['sslverify'] ?? null];
+        update_option('wuai_qa_download_calls', $calls, false);
+        if ($mode === 'download-timeout' || $mode === 'download-fail' || ($mode === 'fallback-install' && !$asset_api)) {
+            if (!empty($args['filename'])) file_put_contents($args['filename'], 'QA partial download');
+            return new WP_Error('http_request_failed', 'cURL error 28: Operation timed out after 10000 milliseconds with 0 out of 0 bytes received');
+        }
+        if ($mode === 'slow') sleep(6);
+        $kind = in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'missing-downloader', 'requirements'], true) ? $mode : 'valid';
+        $file = dirname(__DIR__) . '/qa-update/' . $kind . '.zip';
+        if (!empty($args['stream'])) copy($file, $args['filename']);
+        return ['response' => ['code' => 200, 'message' => 'OK'], 'headers' => [], 'body' => '', 'cookies' => []];
+    }
     if (strpos($url, 'https://api.github.com/repos/') === 0) {
         update_option('wuai_qa_api_calls', (int) get_option('wuai_qa_api_calls', 0) + 1);
         if ($mode === 'network') return new WP_Error('http_request_failed', 'QA network disconnected');
@@ -30,14 +48,6 @@ add_filter('pre_http_request', function ($pre, $args, $url) {
         $data = wuai_qa_release($version);
         if (strpos($url, 'per_page') !== false) $data = [wuai_qa_release('98.0.0'), wuai_qa_release('99.0.0-beta.2'), wuai_qa_release('99.0.0-beta.1')];
         return ['response' => ['code' => $status, 'message' => 'QA'], 'headers' => [], 'body' => wp_json_encode($data), 'cookies' => []];
-    }
-    if (strpos($url, 'https://github.com/xiaoeyl/wuai-game-library/releases/download/') === 0) {
-        if ($mode === 'download-fail') return new WP_Error('http_request_failed', 'QA download failed');
-        if ($mode === 'slow') sleep(6);
-        $kind = in_array($mode, ['bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'requirements'], true) ? $mode : 'valid';
-        $file = dirname(__DIR__) . '/qa-update/' . $kind . '.zip';
-        if (!empty($args['stream'])) copy($file, $args['filename']);
-        return ['response' => ['code' => 200, 'message' => 'OK'], 'headers' => [], 'body' => '', 'cookies' => []];
     }
     return $pre;
 }, 10, 3);
@@ -65,6 +75,7 @@ add_action('wp_ajax_wuai_qa_mode', function () {
     check_ajax_referer('wuai_sluyu_update', 'nonce');
     $mode = sanitize_key($_POST['mode'] ?? 'current');
     update_option('wuai_qa_update_mode', $mode);
+    if (!empty($_POST['reset_downloads'])) delete_option('wuai_qa_download_calls');
     if (isset($_POST['channel'])) {
         $o = wuai_sluyu_get_options();
         $o['github_channel'] = $_POST['channel'] === 'beta' ? 'beta' : 'stable';
@@ -73,5 +84,5 @@ add_action('wp_ajax_wuai_qa_mode', function () {
     if ($mode === 'busy') update_option('wuai_sluyu_update.lock', time(), false);
     else delete_option('wuai_sluyu_update.lock');
     if ($mode === 'stale') update_option('wuai_sluyu_update_job', ['id' => 'qa-stale-job-123', 'phase' => 'downloading', 'percent' => 20, 'updated_at' => time() - 1000], false);
-    wp_send_json_success(['calls' => get_option('wuai_qa_api_calls'), 'phases' => get_option('wuai_qa_progress'), 'options' => wuai_sluyu_get_options(), 'backups' => get_option('wuai_sluyu_options_backups')]);
+    wp_send_json_success(['calls' => get_option('wuai_qa_api_calls'), 'downloads' => get_option('wuai_qa_download_calls', []), 'phases' => get_option('wuai_qa_progress'), 'options' => wuai_sluyu_get_options(), 'backups' => get_option('wuai_sluyu_options_backups')]);
 });

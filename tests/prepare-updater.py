@@ -48,12 +48,14 @@ plugin.parent.mkdir(parents=True, exist_ok=True)
 shutil.copy2(ROOT / 'tests/updater-fixture.php', plugin)
 packages = WP / 'wp-content/qa-update'
 packages.mkdir(exist_ok=True)
-for kind in ['valid', 'bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'requirements']:
+for kind in ['valid', 'bad-version', 'bad-directory', 'missing-file', 'missing-bootstrap', 'missing-downloader', 'requirements']:
     with zipfile.ZipFile(packages / (kind + '.zip'), 'w', zipfile.ZIP_DEFLATED) as archive:
         for name in names:
             if kind == 'missing-file' and name.endswith('/inc/admin-options.php'):
                 continue
             if kind == 'missing-bootstrap' and name.endswith('/inc/portal.php'):
+                continue
+            if kind == 'missing-downloader' and name.endswith('/inc/update-download.php'):
                 continue
             raw = (SOURCE / name).read_bytes()
             if name == 'wuai-sluyu/functions.php':
@@ -70,4 +72,4 @@ for kind in ['valid', 'bad-version', 'bad-directory', 'missing-file', 'missing-b
             archive.writestr(name, raw)
 manifest = {'version': version.decode(), 'files': hashes, 'package_files': len(names)}
 (WP / 'updater-source-manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-print('Prepared full current theme, fixture and six test packages: ' + str(len(names)) + ' files; baseline ' + version.decode())
+print('Prepared full current theme, fixture and seven test packages: ' + str(len(names)) + ' files; baseline ' + version.decode())

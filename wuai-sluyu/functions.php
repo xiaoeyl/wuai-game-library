@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WUAI_SLUYU_VERSION', '1.6.0');
+define('WUAI_SLUYU_VERSION', '1.6.1');
 define('WUAI_SLUYU_ECONOMY_CONTRACT', 1);
 define('WUAI_SLUYU_DIR', get_stylesheet_directory());
 define('WUAI_SLUYU_URI', get_stylesheet_directory_uri());
